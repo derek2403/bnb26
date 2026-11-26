@@ -1,6 +1,6 @@
 {
   "chainId": 97,
-  "updatedAt": "2026-11-26T16:09:47.890Z",
+  "updatedAt": "2026-11-26T19:02:12.488Z",
   "deployer": "0x31777694F7b90b635B1F3B786f5D24be7651BE7B",
   "tokens": {
     "tNVDA": "0x5Df0DC395E7686bcDc41f75891f1Ab982476fddd",
@@ -141,7 +141,9 @@
         "token": "0xFc500e99b8bEFC3c637503469153DFE928977777",
         "vault": "0x02e1945d2b5705d47747b6735bb25BEcc0C60D24",
         "poolId": "nvda-flap",
-        "launchTx": "0x0b5e88b6d213529805a51900f5493e4c7ffb27e236e7ad5cd0428002b7b46850"
+        "launchTx": "0x0b5e88b6d213529805a51900f5493e4c7ffb27e236e7ad5cd0428002b7b46850",
+        "lpPair": "0x74CC1aD1E0BA60f1E7Ea88a93759C6C43c57b520",
+        "taxProcessor": "0x6dF5b8B355347A6fcE176AdFe1Fc69028bd395ed"
       }
     ]
   },
@@ -169,7 +171,8 @@
         "pair": null,
         "phase": "Trading",
         "createTx": "0x4b55ac3ccfce5034903f375d31e647fb7a42753121e1a12f10528c46f31d463e",
-        "migrateTx": null
+        "migrateTx": null,
+        "hidden": true
       },
       {
         "token": "0x9f1b6E43BA3c817523504628f6DfFB71cA135703",
@@ -186,6 +189,21 @@
         "createTx": "0x6de31e3ce53289dc50ee3706c2777e63d5814437fc1829414583782922e7461a",
         "migrateTx": "0x8359891ff4e49357a7607f5df2fb49562ce04716ca14c2cc6c8b03220cbe99fb",
         "hidden": true
+      },
+      {
+        "token": "0xDf99BC0b04a166Dd3C21dDe4dA4a16e8Ad4981a3",
+        "poolId": "tsla-four",
+        "name": "TSLA Market",
+        "symbol": "TSLAM",
+        "presetId": "1795700948232",
+        "vault": "0x89000554F199C31cfA7c09D9C73EF6615181e047",
+        "migrateModule": "0x579DE5d8ae097Da7E00e0b7896D7fABAa9AfB07a",
+        "customData": "0x0006D3d3c88644D7C9e9C37AabF312A8E37a8c75",
+        "branch": null,
+        "pair": null,
+        "phase": "Trading",
+        "createTx": "0x41552169e09ef77d0f3298274bae9c0497846f7ead1d52a03c819d48fb5eb26e",
+        "migrateTx": null
       }
     ],
     "baselinePresetId": "1795700944983",
