@@ -115,7 +115,7 @@ export default function ProofPage() {
   return (
     <>
       <PageHeader title="Proof" lede="Every price and every CMC call is provable on-chain. The full address book with BscScan links, the events behind each demo step, and one CMC snapshot you can re-verify in your browser." />
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card
           className="lg:col-span-2"
           title="Address book"
@@ -178,14 +178,16 @@ function CmcUsage() {
           </div>
           {k?.summed_credit_count !== undefined && <div className="mt-1 text-xs text-muted">Sum of credit_count in our log: {k.summed_credit_count} (reconciles with key/info).</div>}
           {u.today && u.today.length > 0 && (
-            <table className="num mt-2 w-full text-xs">
+            <div className="mt-2 overflow-x-auto">
+            <table className="num w-full text-xs">
               <thead><tr><th className="table-head px-0">Endpoint today</th><th className="table-head text-right">calls</th><th className="table-head text-right">credits</th><th className="table-head text-right">errors</th></tr></thead>
               <tbody>
                 {u.today.map((r) => (
-                  <tr key={r.endpoint} className="border-t border-line"><td className="truncate py-1 text-muted">{r.endpoint}</td><td className="text-right">{r.calls}</td><td className="text-right">{r.credits}</td><td className="text-right">{r.errors}</td></tr>
+                  <tr key={r.endpoint} className="border-t border-line"><td className="break-all py-1 pr-2 text-muted">{r.endpoint}</td><td className="text-right">{r.calls}</td><td className="text-right">{r.credits}</td><td className="text-right">{r.errors}</td></tr>
                 ))}
               </tbody>
             </table>
+            </div>
           )}
           {u.keyInfo && u.keyInfo.length > 1 && (
             <ul className="num mt-2 max-h-28 overflow-auto text-xs text-muted">

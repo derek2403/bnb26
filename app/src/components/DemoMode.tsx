@@ -79,7 +79,10 @@ export function DemoBar() {
           )}
           {next ? (
             <Link href={next.href} className="btn-stable btn-sm min-h-[26px]">
-              Next<span className="hidden sm:inline">: {next.title}</span> →
+              <span>
+                Next<span className="hidden sm:inline">: {next.title}</span>
+              </span>{" "}
+              →
             </Link>
           ) : (
             <Link href={DEMO_PAGES[0].href} className="btn btn-sm min-h-[26px]">

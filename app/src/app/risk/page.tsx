@@ -64,7 +64,10 @@ export default function RiskPage() {
   const ref = view ? w(view.refPrice) : undefined;
   const dev = push && ref ? (push - ref) / ref : undefined;
   const pullP = pull.data?.price ?? undefined;
-  const rwa = prices.data?.prices[sym];
+  // Fallback prices (no CMC key on the app server) are placeholders, not CMC data: never label them "CMC RWA".
+  const rwaRow = prices.data?.prices[sym];
+  const rwa = rwaRow && rwaRow.source !== "fallback" ? rwaRow : undefined;
+  const srcTx = lr && /^0x0*$/i.test(lr[1].srcTxHash) ? undefined : lr?.[1].srcTxHash;
 
   return (
     <>
@@ -92,8 +95,16 @@ export default function RiskPage() {
           </div>
           {lr && (
             <p className="mt-3 text-xs text-muted">
-              Mirror round relayed from BSC mainnet Atlas feed, source tx{" "}
-              <a className="num link" href={`https://bscscan.com/tx/${lr[1].srcTxHash}`} target="_blank" rel="noreferrer">{short(lr[1].srcTxHash, 6)}</a>. Mirror <Addr a={mirror} />.
+              Mirror round relayed from the BSC mainnet Atlas feed
+              {srcTx ? (
+                <>
+                  , source tx{" "}
+                  <a className="num link" href={`https://bscscan.com/tx/${srcTx}`} target="_blank" rel="noreferrer">{short(srcTx, 6)}</a>
+                </>
+              ) : (
+                ` (round #${lr[0].toString()}, pushed ${fmtAge(now - Number(lr[1].pushedAt))} ago)`
+              )}
+              . Mirror <Addr a={mirror} />.
             </p>
           )}
         </Card>
