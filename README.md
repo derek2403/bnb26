@@ -1,8 +1,10 @@
-# SplitStock (draft)
+# MORE
 
-> BNB Hack Bangkok · Developer, CMC × Atlas, Flap and Four.meme tracks. **Status: code complete; Flap factories deployed on BSC testnet; core tests and a Flap fork integration test passing; full deploy in progress** (see [Status](#status)).
+**Leverage on real stocks, no liquidations.** MORE splits a tokenized stock into sUSD (a stock-backed dollar) and xSTOCK (about 2x leverage that is never liquidated).
 
-SplitStock splits a tokenized stock into two tokens:
+> BNB Hack Bangkok · Developer, CMC × Atlas, Flap and Four.meme tracks. **Status: deployed on BSC testnet; the Flap launch is complete and opened the NVDA pool; the Four.meme (OpenFour) preset is live** (see [Status](#status) and [docs/DEPLOYED.md](./docs/DEPLOYED.md)).
+
+MORE splits a tokenized stock into two tokens:
 
 - **sUSD-<SYM>**, a dollar backed by the stock;
 - **x<SYM>**, leverage of about 2x that is never liquidated.
@@ -13,11 +15,11 @@ Nobody borrows, so nobody can be liquidated. Instead, a sell zone and a buy zone
 - **Risk limits:** they come from CoinMarketCap data. A deterministic keeper posts hashed CMC snapshots on-chain. An AI Risk Steward with an ERC-8004 identity may *tighten* the limits immediately; any loosening waits behind a timelock and a Guardian veto.
 - **Market hours:** NYSE hours and gaps are enforced on-chain by a `MarketCalendar`.
 
-**One output, two launchpads.** Every launch opens a NEW SplitStock pool through the shared `PoolFactory.createPool`. The raise becomes protocol-owned first-loss xSTOCK through `pool.seed(cIn, backstop)`, and the launch token's fees fund that pool's backstop.
+**One output, two launchpads.** Every launch opens a NEW MORE pool through the shared `PoolFactory.createPool`. The raise becomes protocol-owned first-loss xSTOCK through `pool.seed(cIn, backstop)`, and the launch token's fees fund that pool's backstop.
 
 | | Flap → NVDA pool | Four.meme (OpenFour) → TSLA pool |
 |---|---|---|
-| Raise | Crowdfund in tBNB (`SplitLauncher`, Flap Pool Launch, 7777 tax token) | Fair launch quoted in mock tTSLA (our "SplitStock Pool Launch" preset on our own OpenFour fork) |
+| Raise | Crowdfund in tBNB (`SplitLauncher`, Flap Pool Launch, 7777 tax token) | Fair launch quoted in mock tTSLA (our "MORE Pool Launch" preset on our own OpenFour fork) |
 | Pool opened by | `SplitLauncher.openPool()` | `SplitPoolMigrateModule.executeMigration` at graduation |
 | First-loss x goes to | `BackstopVault` (Flap vault, funded by 50% of the token tax) | `BackstopTreasury` (preset author/partner fees) |
 | Fallback | `releaseSeed()` to the vault after 14 days | meme/tTSLA PancakeSwap pair after the grace window |
@@ -26,9 +28,33 @@ Loss order when the price falls: zones (rebalance) → StabilityPool → backsto
 
 `V = C·P + U`, `E = V − S`, `xNAV = E / X`, `L = C·P / E`, `CR = V / S`.
 
-Prior art: f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and a leveraged token. SplitStock differs in four ways: it is backed by stock, its trigger comes from outside data, it handles market hours and gaps, and it deleverages through a DEX with a launch-funded backstop.
+Prior art: f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and a leveraged token. MORE differs in four ways: it is backed by stock, its trigger comes from outside data, it handles market hours and gaps, and it deleverages through a DEX with a launch-funded backstop.
 
 **Limits.** The testnet assets are mocks labelled MOCK. The testnet price arrives through a relayed mirror. No real-money mainnet pool exists. The mainnet (56) contracts are read-only anchors.
+
+## Docs
+
+- [docs/DEMO.md](./docs/DEMO.md): the 3-minute demo script (7 scenes).
+- [docs/WRITEUP.md](./docs/WRITEUP.md): the one-page CMC × Atlas write-up (feeds, endpoints, on-chain effects, contract addresses).
+- [docs/HACKQUEST.md](./docs/HACKQUEST.md): ready-to-paste HackQuest submission fields.
+- [docs/REHEARSAL.md](./docs/REHEARSAL.md): the testnet rehearsal run.
+- [docs/DEPLOYED.md](./docs/DEPLOYED.md): deployed state, transactions and the keeper.
+
+## SPLIT: the backstop token
+
+SPLIT is the token we launched on Flap. It is a backstage safety-module token, similar in role to the Aave Safety Module: the product app never shows it, and users only see sUSD, xSTOCK and the pool's insurance vault.
+
+- **What it did:** its Flap raise seeded the NVDA pool's first-loss xNVDA through `SplitLauncher.openPool()` → `pool.seed`. That xNVDA is protocol-owned and held by the `BackstopVault`.
+- **What it does:** SPLIT has a 3% buy/sell tax for 30 days. 50% of the tax goes to the `BackstopVault` (20% LP, 30% burn). The keeper dispatches it (`FLAP_DISPATCH=true`). The vault is the pool's insurance: while CR < 1 it swaps BNB for USDC and donates it to the pool, capped at the deficit and at 50% of its buffer per day.
+- **What it does not do (yet):** SPLIT gives no claim on the pool, no fee share and no governance today. The roadmap items below would add that, and each needs new contracts.
+
+## Roadmap
+
+- **Stake SPLIT into a market's insurance.** Stakers back a pool's insurance vault and take a share of its fees, with a slashing-style first loss when the vault covers a deficit.
+- **Stake SPLIT to open a new stock market.** A market opens when enough SPLIT is staked behind it, as a pump.fun-style creation flow with insurance attached from day one.
+- **Mainnet NVDAB.** A pool on the real NVDAB token reading the Atlas feed directly (no relayed mirror), with Atlas pull pricing in the pool's mint and redeem paths.
+- **More stocks.** TSLA live from the Four.meme graduation, then more tokenized stocks with Atlas feeds and CMC data.
+- **sUSD liquidity.** sUSD/USDT pairs and a peg-keep (buy below $0.99, redeem at $1).
 
 ## Architecture
 
@@ -59,7 +85,7 @@ Prior art: f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and
   - the AI Risk Steward;
   - a Fastify API;
   - Postgres.
-- **app/** (Next.js 15): pools, scenario sandbox, risk/agent/proof verifiers, Flap launch page, meme pages, status page.
+- **app/** (Next.js 15), four pages: **Markets** (`/`), **Trade** (`/trade/[id]`: order panel, chart, pool and insurance vault, Risk & AI tab, Stress test sandbox), **Launchpad** (`/launchpad`, Four.meme memes) and **Transparency** (`/transparency`: addresses, events, CMC logs). The older routes (`/pools`, `/scenario`, `/risk`, `/agent`, `/memes`, `/proof`, `/backstop`, `/launch`) redirect to these. The app never shows the backstop token.
 - **flap-ui/**: the Flap launcher UI package and the vault UI package, built inside Flap's templates.
 
 ## Repo layout
@@ -141,7 +167,7 @@ Rules:
 
 ## Flap review notes
 
-**Pool config is fixed per factory pair.** `SplitStockConfig` takes the whole pool target (PoolFactory, stock token, price feed, pool and swap routers, Atlas BNB/USD, ScenarioPool, boost token, pool symbol) in its constructor, validates it there (every address has code, `poolFactory.usdc()` is a contract, the ScenarioPool belongs to that PoolFactory, non-empty asset id, 1–10 byte symbol) and stores it as immutables. It has no admin, no setter, no queue and no Guardian function, and it holds no funds. `SplitLauncherFactory` stores its address as an immutable. Nobody, including the team, the Timelock and the Flap Guardian, can redirect a Launcher's seed at `openPool` or a vault's buffer at `cover`. The only upgrade path left is the one Flap's model already gives the Guardian: each factory's beacon. A new SplitStock core deployment means a new config + factory pair and a new Flap enable request.
+**Pool config is fixed per factory pair.** `SplitStockConfig` takes the whole pool target (PoolFactory, stock token, price feed, pool and swap routers, Atlas BNB/USD, ScenarioPool, boost token, pool symbol) in its constructor, validates it there (every address has code, `poolFactory.usdc()` is a contract, the ScenarioPool belongs to that PoolFactory, non-empty asset id, 1–10 byte symbol) and stores it as immutables. It has no admin, no setter, no queue and no Guardian function, and it holds no funds. `SplitLauncherFactory` stores its address as an immutable. Nobody, including the team, the Timelock and the Flap Guardian, can redirect a Launcher's seed at `openPool` or a vault's buffer at `cover`. The only upgrade path left is the one Flap's model already gives the Guardian: each factory's beacon. A new MORE core deployment means a new config + factory pair and a new Flap enable request.
 
 **Core implementations are pinned too.** `PoolFactory.setImplementations` is a core-admin function (deployer, then the Timelock), and `openPool` hands the seed to a freshly cloned pool. So `SplitStockConfig` also records the PoolFactory's `poolImpl`, `tokenImpl` and `stabilityPoolImpl` at deployment (`implementations()`), and `SplitLauncher.openPool` reverts `CoreImplementationChanged` if the PoolFactory reports anything else. A swapped implementation can therefore never receive a seed: `openPool` stays blocked and, after 14 days, `releaseSeed` sends the seed to the BackstopVault (fork test `test_08`). `openPool` also cannot run on a halted feed, because `pool.seed` reverts `FeedHalted` in the same transaction.
 
@@ -210,8 +236,8 @@ Mitigations:
   - `npm run build` passes in `app`.
   - flap-ui `build:launcher` (check-source, typecheck, zip) and `check:vault` pass.
 - **Tests that exist and pass:** `test/LeveragePool.t.sol` (88 tests), `test/Zones.t.sol`, `test/OracleRisk.t.sol`, the invariant suite, `test/launch/CoreAbiPin.t.sol`, and `test/fork/FlapLaunchFork.t.sol`. The Flap fork test runs against the live BSC testnet Portal v1.2.0: `newLauncher`, then contributions, then `launchTaxTokenV2`, then trade, dispatch, `openPool`, claim and refund. Still pending: the OpenFour Hardhat module tests, the services unit tests and the vault e2e.
-- **Nothing is deployed:** no contract has been deployed or broadcast. `deployments/97.json` and `56.json` do not exist yet, so the app shows "not deployed" states and flap-ui uses placeholder addresses.
-- **Sponsor gates:** Flap must enable both factories (multiplier 5000 requested). Four.meme must confirm that a prototype on our own fork is accepted.
+- **Deployed (BSC testnet 97):** the core, oracles, Flap factories and OpenFour fork. The Flap launch filled, launched and graduated, and opened the `nvda-flap` pool. `deployments/97.json` is the address book; [docs/DEPLOYED.md](./docs/DEPLOYED.md) has the details. The mainnet (56) read-only anchors are not deployed yet.
+- **Sponsor gates:** Flap enabled the factories. Four.meme must confirm that a prototype on our own fork is accepted.
 - **Open items:** the `[UNVERIFIED]` items and TODOs per component are in [`BUILD_NOTES.md`](./BUILD_NOTES.md). They include:
   - Atlas pull feed ids;
   - the CMC response shapes for RWA, DEX pools and k-line;
