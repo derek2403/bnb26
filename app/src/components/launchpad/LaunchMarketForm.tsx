@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { formatEther, parseEther, zeroAddress, type Address } from "viem";
 import { bscTestnet } from "viem/chains";
@@ -256,6 +257,24 @@ function LaunchCard({ l }: { l: MyLaunch }) {
   const pool = v<Address>(6);
   const token = liveToken && liveToken !== zeroAddress ? liveToken : l.token;
   const pct = raised !== undefined && target > 0n ? Math.min(100, Number((raised * 10000n) / target) / 100) : 0;
+  const open = !!pool && pool !== zeroAddress;
+  const [funding, setFunding] = useState(false);
+  const [fundMsg, setFundMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Demo funding: a server-side testnet key fills the rest of the raise and opens the market (no wallet popup).
+  const fund = async () => {
+    setFunding(true);
+    setFundMsg(null);
+    try {
+      const res = await fetch("/api/launch/fund", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ launcher: l.launcher }) });
+      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[] };
+      setFundMsg(j.ok ? { ok: true, text: j.steps?.length ? `Done: ${j.steps.join("; ")}.` : "The market is open." } : { ok: false, text: j.error ?? "Funding failed." });
+    } catch {
+      setFundMsg({ ok: false, text: "Funding failed. Try again." });
+    } finally {
+      setFunding(false);
+      void r.refetch();
+    }
+  };
   const status = pool && pool !== zeroAddress ? "Market open" : launched ? "Raise filled" : failed ? "Refunding" : raised === undefined ? "…" : "Pre-funding";
 
   return (
@@ -299,9 +318,21 @@ function LaunchCard({ l }: { l: MyLaunch }) {
           </>
         )}
       </div>
-      <a href={flapLauncherUrl(l.launcher)} target="_blank" rel="noreferrer" className="btn-primary btn-sm mt-3 w-full">
-        View on Flap
-      </a>
+      {fundMsg && <p className={`mt-2 text-2xs ${fundMsg.ok ? "text-good" : "text-bad"}`}>{fundMsg.text}</p>}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {open ? (
+          <Link href={`/trade/${l.stock.toLowerCase()}-${pool!.slice(2, 8).toLowerCase()}`} className="btn-primary btn-sm w-full">
+            Trade this market
+          </Link>
+        ) : (
+          <button className="btn-primary btn-sm w-full" disabled={funding || failed === true || raised === undefined} onClick={fund}>
+            {funding ? "Funding and opening (about a minute)…" : launched ? "Open the market" : "Fund and open the market"}
+          </button>
+        )}
+        <a href={flapLauncherUrl(l.launcher)} target="_blank" rel="noreferrer" className="btn btn-sm w-full">
+          View on Flap
+        </a>
+      </div>
     </div>
   );
 }
