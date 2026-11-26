@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 2,
+  "mode": "mini-app",
+  "appModel": "standalone",
+  "slug": "splitstock",
+  "artifactId": "vaultui_splitstock_01M8CHYSP1D1V100YEC84KMWMH",
+  "name": "splitstock",
+  "displayTitle": {
+    "en": "MORE NVDA Pool",
+    "zh": "MORE NVDA 池"
+  },
+  "match": {
+    "bindings": []
+  },
+  "i18n": [
+    "en",
+    "zh"
+  ],
+  "walletChains": [
+    97
+  ],
+  "walletContracts": [
+    {
+      "id": "splitstock-pool",
+      "chainId": 97,
+      "address": "0x0CD861cd0dD919434019f18F71630D2F678CD208",
+      "allow": [
+        "function mintStable(uint256 cIn, uint256 minOut, uint256 deadline) returns (uint256)",
+        "function mintLever(uint256 cIn, uint256 minOut, uint256 deadline) returns (uint256)",
+        "function redeemStable(uint256 s, uint256 minC, uint256 minU) returns (uint256 cOut, uint256 uOut)",
+        "function redeemLever(uint256 x, uint256 minC, uint256 minU) returns (uint256 cOut, uint256 uOut)",
+        "function redeemPair(uint256 sMax, uint256 xMax, uint256 minC, uint256 minU) returns (uint256 sBurned, uint256 xBurned, uint256 cOut, uint256 uOut)"
+      ],
+      "read": [
+        "function state() view returns ((uint256 C, uint256 U, uint256 S, uint256 X, uint256 price, uint256 priceUpdatedAt, uint256 priceAge, bool priceFresh, bool feedHalted, uint256 V, int256 E, uint256 xNav, uint256 leverage, uint256 collateralRatio, uint8 mode, bool marketOpen, bool gapGuard, bool mintsPaused, uint256 triggerLev, uint256 targetLev, uint256 lowerTriggerLev, uint256 maxMintLev, uint256 stableMintFeeBps, uint256 leverMintFeeBps, uint8 riskSource, uint256 snapshotId) st)",
+        "function maxMintStable() view returns (uint256 cInMax)",
+        "function xToken() view returns (address)",
+        "function usdc() view returns (address)",
+        "function previewMintStable(uint256 cIn) view returns (uint256 sOut, uint256 feeBps)",
+        "function previewMintLever(uint256 cIn) view returns (uint256 xOut, uint256 feeBps)",
+        "function previewRedeemStable(uint256 s) view returns (uint256 cOut, uint256 uOut, uint256 feeBps)",
+        "function previewRedeemLever(uint256 x) view returns (uint256 cOut, uint256 uOut, uint256 feeBps)",
+        "function previewRedeemPair(uint256 sMax, uint256 xMax) view returns (uint256 sBurned, uint256 xBurned, uint256 cOut, uint256 uOut)"
+      ],
+      "erc20Approval": {
+        "allowlist": [
+          "0x5Df0DC395E7686bcDc41f75891f1Ab982476fddd"
+        ],
+        "maxApprovalWei": "50000000000000000000"
+      }
+    },
+    {
+      "id": "splitstock-stability-pool",
+      "chainId": 97,
+      "address": "0x36Fe40CE6925fd1711ae3aC9e89c3348E1354d07",
+      "allow": [
+        "function deposit(uint256 amount)",
+        "function withdraw(uint256 amount)",
+        "function claimGains() returns (uint256 assetGain, uint256 stableReward)"
+      ],
+      "read": [
+        "function totalDeposits() view returns (uint256)",
+        "function depositOf(address user) view returns (uint256)",
+        "function gainsOf(address user) view returns (uint256 assetGain, uint256 stableReward)"
+      ],
+      "erc20Approval": {
+        "allowlist": [
+          "0xe1F327e5D9B6DC7542a111C4c978673b07918011"
+        ],
+        "maxApprovalWei": "10000000000000000000000"
+      }
+    },
+    {
+      "id": "tnvda-faucet",
+      "chainId": 97,
+      "address": "0x5Df0DC395E7686bcDc41f75891f1Ab982476fddd",
+      "allow": [
+        "function faucet() returns (uint256 amount)"
+      ],
+      "read": [
+        "function faucetAmount() view returns (uint256)",
+        "function faucetCooldown() view returns (uint256)",
+        "function lastFaucetAt(address who) view returns (uint256 ts)"
+      ]
+    }
+  ]
+}

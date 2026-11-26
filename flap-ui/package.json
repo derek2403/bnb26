@@ -2,11 +2,12 @@
   "name": "splitstock-flap-ui",
   "private": true,
   "type": "module",
-  "description": "SplitStock Flap Launcher UI (launcher-config-preview/v1) and BackstopVault UI source packages.",
+  "description": "SplitStock Flap Launcher UI (launcher-config-preview/v1), BackstopVault UI and NVDA pool Mini App v2 source packages.",
   "scripts": {
     "sync": "node scripts/sync-addresses.mjs",
     "setup": "node scripts/build.mjs setup",
     "build:launcher": "node scripts/build.mjs launcher",
-    "check:vault": "node scripts/build.mjs vault"
+    "check:vault": "node scripts/build.mjs vault",
+    "build:miniapp": "node scripts/build.mjs miniapp"
   }
 }

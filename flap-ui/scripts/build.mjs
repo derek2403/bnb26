@@ -4,6 +4,8 @@
 //   node flap-ui/scripts/build.mjs setup      clone both template checkouts into flap-ui/.template and install them
 //   node flap-ui/scripts/build.mjs launcher   check-source + typecheck + zip -X -j -> flap-ui/dist/splitstock-launcher.zip
 //   node flap-ui/scripts/build.mjs vault      typecheck + vault:check (packaging needs vault:e2e, run later)
+//   node flap-ui/scripts/build.mjs miniapp    copy flap-ui/miniapp into the template, then app:check + app:e2e + app:package
+//                                            + app:verify-package -> flap-ui/dist/splitstock-miniapp.zip
 //
 // Template locations can be overridden with FLAP_LAUNCHER_TEMPLATE_DIR (branch test/pool-launch-developer-preview)
 // and FLAP_VAULT_TEMPLATE_DIR (branch main).
@@ -24,6 +26,9 @@ const launcherZip = path.join(distDir, "splitstock-launcher.zip");
 const launcherFiles = ["Component.tsx", "manifest.json", "i18n.json"];
 const vaultFolder = "splitstock-backstop";
 const vaultFiles = ["Component.tsx", "manifest.json", "VaultABI.ts", "i18n.json"];
+const miniAppDir = path.join(flapUi, "miniapp");
+const miniAppSlug = "splitstock";
+const miniAppZip = path.join(distDir, "splitstock-miniapp.zip");
 
 function run(command, args, cwd) {
   console.log(`$ (${path.relative(flapUi, cwd) || "."}) ${command} ${args.join(" ")}`);
@@ -79,11 +84,27 @@ function vault() {
   console.log(`Vault source checked. To package after SPLIT exists: (cd ${vaultTemplate} && yarn vault:e2e ${vaultFolder} && yarn vault:package ${vaultFolder} && yarn vault:verify-package dist/${vaultFolder}.zip)`);
 }
 
+function miniapp() {
+  requireTemplate(vaultTemplate, "main");
+  const target = path.join(vaultTemplate, "src", "vaults", miniAppSlug);
+  const registered = fs.readFileSync(path.join(vaultTemplate, "src", "vaults", "index.ts"), "utf8").includes(`"${miniAppSlug}"`);
+  typecheckIn(vaultTemplate, target, vaultFiles, miniAppDir);
+  if (!registered) run("yarn", ["-s", "vault:register", miniAppSlug], vaultTemplate);
+  run("yarn", ["-s", "app:check", miniAppSlug], vaultTemplate);
+  run("yarn", ["-s", "app:e2e", miniAppSlug], vaultTemplate);
+  run("yarn", ["-s", "app:package", miniAppSlug], vaultTemplate);
+  run("yarn", ["-s", "app:verify-package", `dist/${miniAppSlug}.zip`], vaultTemplate);
+  fs.mkdirSync(distDir, { recursive: true });
+  fs.copyFileSync(path.join(vaultTemplate, "dist", `${miniAppSlug}.zip`), miniAppZip);
+  console.log(JSON.stringify({ ok: true, zip: miniAppZip, bytes: fs.statSync(miniAppZip).size }));
+}
+
 const command = process.argv[2];
 if (command === "setup") setup();
 else if (command === "launcher") launcher();
 else if (command === "vault") vault();
+else if (command === "miniapp") miniapp();
 else {
-  console.error("Usage: node flap-ui/scripts/build.mjs <setup|launcher|vault>");
+  console.error("Usage: node flap-ui/scripts/build.mjs <setup|launcher|vault|miniapp>");
   process.exit(1);
 }
