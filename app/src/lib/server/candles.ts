@@ -28,6 +28,9 @@ export function symbolForPool(id: string): { symbol: string; demo: boolean } | u
   const p = deployments97.pools.find((x) => x.id === id);
   if (p) return { symbol: p.symbol, demo: false };
   if (EXPECTED_SYMBOL[id]) return { symbol: EXPECTED_SYMBOL[id], demo: false };
+  // A market opened by a user-created Flap launch: "<symbol>-<first 6 hex of the pool>" (usePools launchMarketId).
+  const m = /^([a-z]{2,6})-[0-9a-f]{6}$/.exec(id);
+  if (m && CMC_IDS[m[1].toUpperCase()]) return { symbol: m[1].toUpperCase(), demo: false };
   return undefined;
 }
 

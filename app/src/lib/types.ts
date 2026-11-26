@@ -69,7 +69,11 @@ export type PoolMeta = {
     stabilityPool?: Address;
     feed?: Address;
     openedBy?: Address;
+    /** Insurance vault of the Flap launch that opened this pool, when it is not the one in deployments. */
+    backstopVault?: Address;
   };
+  /** Set on a market opened by a launch created from the Launch a market form: the launcher contract. */
+  launcher?: Address;
   assetId?: Hex;
   openTx?: Hex;
   /** Atlas pull feed key for /api/atlas/pull (e.g. "nvdab"), when one exists. */

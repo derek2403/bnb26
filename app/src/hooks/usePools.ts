@@ -13,6 +13,7 @@ import { toNum } from "@/lib/format";
 import { toSnapshot, type SimState } from "@/lib/sim";
 import { MODES, RISK_SOURCES, type PoolMeta, type PoolSnapshot, type UserBalances } from "@/lib/types";
 import { useDemoWallet } from "@/components/DemoWallet";
+import { useLaunchList } from "@/hooks/useLaunchList";
 import type { DemoPrices } from "@/lib/server/cmc";
 
 export const REFRESH_MS = 10_000;
@@ -172,13 +173,139 @@ export function useDiscoveredPools(): { metas: PoolMeta[]; loading: boolean } {
   return { metas, loading: enabled && (stage1.isLoading || stage2.isLoading) };
 }
 
-/** Real pools: deployments first, then the ones discovered on-chain. */
-export function useRealMetas(): { real: PoolMeta[]; pending: typeof EXPECTED_REAL; loading: boolean } {
+// ------------------------------------------------------------------ markets from user-created Flap launches
+// A launch created on "Launch a market" is a SplitLauncher this browser remembers (useLaunchList). Until its raise
+// fills it is a pre-funding row; once `launcher.pool()` is set, the pool it opened through PoolFactory is a normal
+// LIVE market with id "<symbol>-<first 6 hex of the pool>" (e.g. nvda-1a2b3c). The id alone is enough to resolve the
+// market (PoolFactory.poolsByAsset(keccak256(SYMBOL)) -> the pool with that address prefix), so /trade/<id> also
+// works in a browser that did not create the launch.
+
+export type LaunchRow = {
+  /** Row key: "launch-<launcher>". */
+  id: string;
+  launcher: Address;
+  symbol: string;
+  name: string;
+  targetLeverage?: number;
+  /** tBNB */
+  raised?: number;
+  /** tBNB */
+  target?: number;
+  /** Raise filled and the token launched on Flap; the pool is not open yet. */
+  launched: boolean;
+  /** Sale window ended below the target. */
+  failed: boolean;
+};
+
+export function launchMarketId(symbol: string, pool: Address): string {
+  return `${symbol.toLowerCase()}-${pool.slice(2, 8).toLowerCase()}`;
+}
+
+export function parseLaunchMarketId(id: string): { symbol: string; prefix: string } | undefined {
+  const m = /^([a-z]{2,6})-([0-9a-f]{6})$/.exec(id);
+  if (!m) return undefined;
+  const symbol = m[1].toUpperCase();
+  return STOCK_NAMES[symbol] && !demoPool(id) ? { symbol, prefix: `0x${m[2]}` } : undefined;
+}
+
+const LAUNCH_READS = ["pool", "raised", "targetRaise", "launched", "failed", "backstopVault", "poolSymbol"] as const;
+
+export function useLaunchMarkets(wantId?: string): { metas: PoolMeta[]; launches: LaunchRow[]; loading: boolean } {
+  const factory = addr(deployments97.core.poolFactory);
+  const list = useLaunchList();
+  const want = useMemo(() => (wantId ? parseLaunchMarketId(wantId) : undefined), [wantId]);
+  const n = LAUNCH_READS.length;
+  const stage1 = useReadContracts({
+    allowFailure: true,
+    query: { enabled: list.length > 0 || (!!want && !!factory), refetchInterval: REFRESH_MS },
+    contracts: [
+      ...list.flatMap((l) => LAUNCH_READS.map((functionName) => ({ address: l.launcher, abi: SplitLauncherAbi, functionName, chainId: bscTestnet.id }))),
+      ...(want && factory ? [{ address: factory, abi: PoolFactoryAbi, functionName: "poolsByAsset" as const, args: [keccak256(toBytes(want.symbol))] as const, chainId: bscTestnet.id }] : []),
+    ] as ContractFunctionParameters[],
+  });
+  const at = <T,>(i: number): T | undefined => (stage1.data?.[i]?.status === "success" ? (stage1.data[i].result as T) : undefined);
+
+  const state = list.map((l, i) => {
+    const pool = addr(at<Address>(i * n));
+    return { entry: l, pool, raised: at<bigint>(i * n + 1), target: at<bigint>(i * n + 2), launched: at<boolean>(i * n + 3) ?? false, failed: at<boolean>(i * n + 4) ?? false, vault: addr(at<Address>(i * n + 5)), poolSymbol: at<string>(i * n + 6) };
+  });
+  const wanted = want ? (at<readonly Address[]>(list.length * n) ?? []).find((a) => a.toLowerCase().startsWith(want.prefix)) : undefined;
+
+  // Pools already in deployments (the headline nvda-flap pool) keep their own row and id.
+  const candidates = useMemo(() => {
+    const known = new Set(deployments97.pools.filter((p) => !p.hidden && (p.kind === "flap" || p.kind === "four")).map((p) => p.pool.toLowerCase()));
+    const out: Address[] = [];
+    for (const s of state) if (s.pool && !known.has(s.pool.toLowerCase()) && !out.some((a) => a.toLowerCase() === s.pool!.toLowerCase())) out.push(s.pool);
+    if (wanted && !out.some((a) => a.toLowerCase() === wanted.toLowerCase())) out.push(wanted);
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.map((s) => s.pool ?? "").join(","), wanted]);
+
+  const stage2 = useReadContracts({
+    allowFailure: true,
+    query: { enabled: !!factory && candidates.length > 0, staleTime: 60_000 },
+    contracts: candidates.map((p) => ({ address: factory!, abi: PoolFactoryAbi, functionName: "poolInfo" as const, args: [p] as const, chainId: bscTestnet.id })),
+  });
+
+  const stateKey = state.map((s) => `${s.entry.launcher}:${s.pool ?? ""}:${s.vault ?? ""}:${s.raised ?? ""}:${s.target ?? ""}:${s.launched}:${s.failed}:${s.entry.name}`).join("|");
+  const metas = useMemo(() => {
+    const out: PoolMeta[] = [];
+    (stage2.data ?? []).forEach((r) => {
+      const i = r.status === "success" ? (r.result as unknown as PoolInfoResult) : undefined;
+      if (!i || i.pool === zeroAddress || i.kind !== 0 || !i.symbol) return;
+      const from = state.find((s) => s.pool?.toLowerCase() === i.pool.toLowerCase());
+      const id = launchMarketId(i.symbol, i.pool);
+      if (out.some((m) => m.id === id)) return;
+      const base = metaFromDeployed({ id, symbol: i.symbol, kind: "flap", pool: i.pool, sUSD: i.sUSD, xToken: i.xToken, stabilityPool: i.stabilityPool, feed: i.feed, openedBy: i.creator, assetId: i.assetId });
+      out.push({
+        ...base,
+        name: from?.entry.name ?? `${i.symbol} Market`,
+        launcher: from?.entry.launcher ?? i.creator,
+        addresses: { ...base.addresses!, asset: addr(i.asset) ?? base.addresses?.asset, backstopVault: from?.vault },
+      });
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage2.data, stateKey]);
+
+  const launches = useMemo(
+    (): LaunchRow[] =>
+      state
+        .filter((s) => !s.pool)
+        .map((s) => {
+          const target = s.target ?? (s.entry.targetRaise && /^\d+$/.test(s.entry.targetRaise) ? BigInt(s.entry.targetRaise) : undefined);
+          return {
+            id: `launch-${s.entry.launcher.toLowerCase()}`,
+            launcher: s.entry.launcher,
+            symbol: s.poolSymbol || s.entry.stock,
+            name: s.entry.name,
+            targetLeverage: s.entry.targetLeverage,
+            raised: s.raised !== undefined ? toNum(s.raised) : undefined,
+            target: target !== undefined ? toNum(target) : undefined,
+            launched: s.launched,
+            failed: s.failed,
+          };
+        }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stateKey],
+  );
+
+  const enabled1 = list.length > 0 || (!!want && !!factory);
+  return { metas, launches, loading: (enabled1 && stage1.isLoading) || (candidates.length > 0 && stage2.isLoading) };
+}
+
+/** Real pools: deployments first, then the ones discovered on-chain, then markets opened by this browser's launches. */
+export function useRealMetas(): { real: PoolMeta[]; pending: typeof EXPECTED_REAL; launches: LaunchRow[]; loading: boolean } {
   const base = useMemo(() => listMetas().real, []);
   const disc = useDiscoveredPools();
-  const real = useMemo(() => [...base, ...disc.metas.filter((m) => !base.some((b) => b.id === m.id))], [base, disc.metas]);
+  const lm = useLaunchMarkets();
+  const real = useMemo(() => {
+    const first = [...base, ...disc.metas.filter((m) => !base.some((b) => b.id === m.id))];
+    const taken = new Set(first.map((m) => m.addresses?.pool.toLowerCase()));
+    return [...first, ...lm.metas.filter((m) => !taken.has(m.addresses?.pool.toLowerCase()) && !first.some((b) => b.id === m.id))];
+  }, [base, disc.metas, lm.metas]);
   const pending = EXPECTED_REAL.filter((e) => !real.some((r) => r.id === e.id || (r.symbol === e.symbol && r.source === e.kind)));
-  return { real, pending, loading: disc.loading };
+  return { real, pending, launches: lm.launches, loading: disc.loading };
 }
 
 // ------------------------------------------------------------------ on-chain -> snapshot
@@ -233,6 +360,8 @@ export function snapshotFromChain(st: PoolStateResult, opts: { assetDecimals?: n
 }
 
 function backstopContract(meta: PoolMeta): ContractFunctionParameters | null {
+  // A market opened by a user-created launch: its own launcher reports the vault buffer (never reverts).
+  if (meta.launcher) return { address: meta.launcher, abi: SplitLauncherAbi, functionName: "backstopBufferUsd" };
   if (meta.source === "flap") {
     const v = addr(launcherForPool(meta.id)?.vault);
     if (v) return { address: v, abi: BackstopVaultAbi, functionName: "bufferUsd" };
@@ -292,9 +421,9 @@ function decodePoolReads(rs: R[], meta: PoolMeta): PoolSnapshot | null {
 
 export type PoolRow = { meta: PoolMeta; snap: PoolSnapshot | null; loading: boolean; priceSource?: "cmc" | "fallback" };
 
-export function usePoolList(): { rows: PoolRow[]; pending: typeof EXPECTED_REAL; pricesSource?: string; discovering: boolean } {
+export function usePoolList(): { rows: PoolRow[]; pending: typeof EXPECTED_REAL; launches: LaunchRow[]; pricesSource?: string; discovering: boolean } {
   const demo = useMemo(() => listMetas().demo, []);
-  const { real, pending, loading: discovering } = useRealMetas();
+  const { real, pending, launches, loading: discovering } = useRealMetas();
   const now = useNow(REFRESH_MS);
   const nowBig = BigInt(Math.floor(now / 60) * 60);
   const contracts = useMemo(() => real.flatMap((m) => poolReads(m, nowBig)), [real, nowBig]);
@@ -315,7 +444,7 @@ export function usePoolList(): { rows: PoolRow[]; pending: typeof EXPECTED_REAL;
       return { meta, snap: prices.isLoading ? null : snap, loading: prices.isLoading, priceSource: p?.source };
     }),
   ];
-  return { rows, pending, pricesSource: prices.data?.source, discovering };
+  return { rows, pending, launches, pricesSource: prices.data?.source, discovering };
 }
 
 // ------------------------------------------------------------------ detail
@@ -335,7 +464,8 @@ export type PoolDetail = {
 
 export function usePool(id: string, override?: PoolMeta): PoolDetail & { discovering: boolean } {
   const disc = useDiscoveredPools();
-  const discovered = disc.metas.find((m) => m.id === id);
+  const launched = useLaunchMarkets(override ? undefined : id);
+  const discovered = disc.metas.find((m) => m.id === id) ?? launched.metas.find((m) => m.id === id);
   const meta = useMemo(() => override ?? findMeta(id) ?? discovered, [id, override, discovered]);
   const { address } = useAccount();
   const now = useNow(REFRESH_MS);
@@ -369,7 +499,7 @@ export function usePool(id: string, override?: PoolMeta): PoolDetail & { discove
 
   const reads = useReadContracts({ contracts, allowFailure: true, query: { enabled: contracts.length > 0, refetchInterval: REFRESH_MS } });
 
-  if (!meta) return { meta, snap: null, user: null, decimals: { asset: 18, usdc: 18 }, loading: disc.loading, refetch: () => {}, discovering: disc.loading };
+  if (!meta) return { meta, snap: null, user: null, decimals: { asset: 18, usdc: 18 }, loading: disc.loading || launched.loading, refetch: () => {}, discovering: disc.loading || launched.loading };
 
   if (meta.isDemo) {
     const def = demoPool(meta.id)!;
