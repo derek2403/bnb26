@@ -34,6 +34,8 @@ Prior art: f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and
 
 ## Docs
 
+- [docs/DEMO-FLOW.md](docs/DEMO-FLOW.md): the current demo script (launch a market, trade in the sandbox, the mechanism, Atlas).
+
 - [docs/DEMO.md](./docs/DEMO.md): the 3-minute demo script (7 scenes).
 - [docs/WRITEUP.md](./docs/WRITEUP.md): the one-page CMC × Atlas write-up (feeds, endpoints, on-chain effects, contract addresses).
 - [docs/HACKQUEST.md](./docs/HACKQUEST.md): ready-to-paste HackQuest submission fields.

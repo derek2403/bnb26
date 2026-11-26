@@ -38,7 +38,7 @@ Each keeper snapshot posts `CmcSnapshot(refPrice, volBps, liqUsd, premiumBps, re
 ## How usage is verifiable
 
 - **Events:** `Mirrored` on each AtlasMirror, `CmcSnapshot` and `AgentProposal` on the RiskOracle.
-- **Hash-chained log:** every CMC and MCP call is logged with the keccak of its raw body; each entry hashes the previous one, and `LogAnchor` stores hourly Merkle roots. `/proof` re-hashes a raw body in the browser and checks it against the on-chain `responseHash`.
+- **Hash-chained log:** every CMC and MCP call is logged with the keccak of its raw body; each entry hashes the previous one, and `LogAnchor` stores hourly Merkle roots. The Transparency page (`/transparency`) re-hashes a raw body in the browser and checks it against the on-chain `responseHash`.
 - **Credits:** `/v1/key/info` is logged hourly beside our own sum of `credit_count`.
 
 ## Safety

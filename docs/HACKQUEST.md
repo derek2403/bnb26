@@ -33,7 +33,7 @@ A MORE pool holds one tokenized stock (C units at price P) plus some USDC (U). P
 - **Risk limits:** CoinMarketCap. The keeper posts hashed CMC snapshots (DEX price, 1h k-lines, quotes, RWA premium, DEX pools) to a `RiskOracle`. On-chain, σ sets the sell trigger, liquidity sets the max sell chunk, the RWA premium sets the open fee, and the CMC price drives a deviation breaker that stops mints.
 - **AI risk steward:** reads CMC REST and CMC MCP (US equity event calendar, macro events, technical analysis, news, global metrics) and proposes limits. Tightening applies at once; loosening waits behind a 30-minute timelock with a Guardian veto. It is registered as ERC-8004 agent #2931.
 - **Market hours:** a `MarketCalendar` enforces NYSE hours, half days and holidays; a closed-market fee and a gap guard apply when the market is shut.
-- **Proof:** every CMC and MCP response is hashed into a hash-chained log whose hourly Merkle roots are stored in `LogAnchor`. `/proof` re-verifies a snapshot in the browser.
+- **Proof:** every CMC and MCP response is hashed into a hash-chained log whose hourly Merkle roots are stored in `LogAnchor`. The Transparency page (`/transparency`) re-verifies a snapshot in the browser.
 
 ### The three tokens
 
@@ -59,8 +59,10 @@ A MORE pool holds one tokenized stock (C units at price P) plus some USDC (U). P
 - A custom launcher UI and vault UI running on Flap's site, built with Flap's templates.
 - A Flap Mini App (built on Flap's Mini App template, submitted for Flap's review): get tNVDA, mint and redeem sUSD / xNVDA, and earn in the StabilityPool without leaving Flap. The vault UI links to it.
 
+- Launching from the app: the "Open a market" form on `/launchpad` creates a launcher through our factory from the user's wallet (stock, requested leverage, raise). A second launch made this way, launcher [0x1217…fe58](https://testnet.bscscan.com/address/0x1217fb582330a155cee36af33855ab4cc515fe58), filled its 4.7 tBNB raise ([tx](https://testnet.bscscan.com/tx/0xc43d27c4d140bd35d1b0c21217c7f90366e477f6e1a86245b78a14362fa7e2ce)), launched token `0x48C4…7777` and opened a second NVDA market, pool [0x892A…9cE2](https://testnet.bscscan.com/address/0x892A4F3d88FA2aAA9647aD508320709eDA4A9cE2) ([tx](https://testnet.bscscan.com/tx/0x4300af0f59d231d208b55726b6a526b7047f8f042d9f5595f32f67db182520e6)).
+
 **Four.meme (OpenFour)**
-- A "MORE Pool Launch" preset (id 1795700948232) on our OpenFour fork: a fair launch quoted in tTSLA whose graduation module opens a new TSLA pool, pairs the meme with sUSD, and sends preset fees to the pool's insurance treasury.
+- A "SplitStock Pool Launch" preset (MORE's preset, id 1795700948232) on our OpenFour fork: a fair launch quoted in tTSLA whose graduation module opens a new TSLA pool, pairs the meme with sUSD, and sends preset fees to the pool's insurance treasury.
 - Why a fork: the OpenFour Developer Guide (§17–18) has builders deploy their own Registry and Core on testnet with `fork-deploy`, register and test modules there, then submit the pack. Only Four.meme registers modules on the official Registry.
 
 ### Prior art
@@ -91,6 +93,7 @@ f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and a leverage
 - Live app: `<APP LINK>`
 - Flap launcher page: https://test.utter.cash/launcher/0x56ceF14ae0171Fb3DFa04DD44EA0811E3D8517c4?chain=bnb-testnet&kind=launcher-detail
 - Address book: [deployments/97.json](../deployments/97.json)
+- Demo script: [docs/DEMO-FLOW.md](./DEMO-FLOW.md)
 
 ## Team
 
