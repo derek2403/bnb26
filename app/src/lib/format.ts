@@ -17,7 +17,7 @@ export function fmtUsd(n: number | undefined | null, opts: { compact?: boolean; 
   if (compact && Math.abs(n) >= 10_000) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 }).format(n);
   }
-  const d = digits ?? (Math.abs(n) >= 1000 ? 0 : Math.abs(n) >= 1 ? 2 : 4);
+  const d = digits ?? (Math.abs(n) >= 1000 ? 0 : Math.abs(n) >= 1 || n === 0 ? 2 : 4);
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
 }
 

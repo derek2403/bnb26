@@ -103,7 +103,7 @@ export const EXPECTED_REAL = [
 ];
 
 export function listMetas(): { real: PoolMeta[]; pending: typeof EXPECTED_REAL; demo: PoolMeta[] } {
-  const real = deployments97.pools.filter((p) => p.kind === "flap" || p.kind === "four").map(metaFromDeployed);
+  const real = deployments97.pools.filter((p) => (p.kind === "flap" || p.kind === "four") && !p.hidden).map(metaFromDeployed);
   const pending = EXPECTED_REAL.filter((e) => !real.some((r) => r.symbol === e.symbol && r.source === e.kind));
   const demo = DEMO_POOLS.map((d) => demoMeta(d.id)!).filter(Boolean);
   return { real, pending, demo };
@@ -142,7 +142,10 @@ export function useDiscoveredPools(): { metas: PoolMeta[]; loading: boolean } {
   });
   const launcherPool = launcher ? (stage1.data?.[need.length]?.status === "success" ? (stage1.data[need.length].result as Address) : undefined) : undefined;
   const candidates = useMemo(() => {
-    const all = lists.flat();
+    // Pools already in deployments (including hidden rehearsal launches) are never "discovered" as the headline
+    // pool: before the live GOBLIN graduation, the newest LIVE TSLA pool would otherwise be the rehearsal one.
+    const known = new Set(deployments97.pools.map((p) => p.pool.toLowerCase()));
+    const all = lists.flat().filter((a) => !known.has(a.toLowerCase()));
     if (launcherPool && launcherPool !== zeroAddress && !all.some((a) => a.toLowerCase() === launcherPool.toLowerCase())) all.push(launcherPool);
     return all;
     // eslint-disable-next-line react-hooks/exhaustive-deps

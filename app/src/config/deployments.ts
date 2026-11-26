@@ -19,6 +19,8 @@ export type DeployedPool = {
   feed?: Address;
   openedBy?: Address;
   openTx?: Hex;
+  /** Rehearsal / test launch: kept for direct links (/pools/<id>) but listed nowhere and never the headline pool. */
+  hidden?: boolean;
 };
 
 export type OracleEntry = {
@@ -83,7 +85,8 @@ export type Deployments = {
     backstopTreasury?: Address;
     /** Optional override of the quote asset the preset requires (defaults to tokens.tTSLA). */
     quoteAsset?: Address;
-    tokens: { token: Address; poolId?: string }[];
+    /** `hidden`: rehearsal launch, left out of /memes (see DeployedPool.hidden). */
+    tokens: { token: Address; poolId?: string; hidden?: boolean }[];
   };
   mainnet: { atlasCmcAnchor?: Address; nvdabLens?: Address; [k: string]: Address | undefined };
   erc8004: { identity?: Address; reputation?: Address; agentId?: number | string | null };
@@ -97,7 +100,7 @@ function clean<T extends object>(x: unknown, fallback: T): T {
 function normalize(raw: unknown, chainId: number): Deployments {
   const r = (raw ?? {}) as Record<string, unknown>;
   const flap = clean(r.flap, { launchers: [] as FlapLauncherEntry[] });
-  const openfour = clean(r.openfour, { tokens: [] as { token: Address; poolId?: string }[] });
+  const openfour = clean(r.openfour, { tokens: [] as { token: Address; poolId?: string; hidden?: boolean }[] });
   const pools = Array.isArray(r.pools)
     ? (r.pools as DeployedPool[]).filter((p) => p && typeof p.id === "string" && isAddress(p.pool ?? ""))
     : [];
@@ -145,7 +148,7 @@ export function launcherForPool(poolId: string): FlapLauncherEntry | undefined {
 }
 
 export function realPools(): DeployedPool[] {
-  return deployments97.pools.filter((p) => p.kind === "flap" || p.kind === "four");
+  return deployments97.pools.filter((p) => (p.kind === "flap" || p.kind === "four") && !p.hidden);
 }
 
 export function scenarioPool(): DeployedPool | undefined {

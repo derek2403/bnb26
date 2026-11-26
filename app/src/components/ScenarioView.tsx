@@ -219,6 +219,29 @@ function OnchainScenario({ meta, feed }: { meta: PoolMeta; feed: Address }) {
         log({ label: "−55%", tone: "bad", txs, text: `Price ${fmtUsd(mid.price)}: CR ${cr(mid.cr)} (${mid.mode}). The backstop vault covers only the shared ScenarioPool, so here sUSD would redeem pro rata.` });
         return;
       }
+      // Ask the vault first: with an empty buffer (no SPLIT tax dispatched yet) or a spent tranche cap, cover() would
+      // revert NothingToCover / EpochCapReached. Explain the loss order instead of sending a failing tx.
+      let ready = false;
+      let bufUsd = 0;
+      try {
+        const [ok, b] = await Promise.all([
+          client!.readContract({ address: vault!, abi: BackstopVaultAbi, functionName: "canCover", args: [pool] }) as Promise<boolean>,
+          client!.readContract({ address: vault!, abi: BackstopVaultAbi, functionName: "bufferUsd" }) as Promise<bigint>,
+        ]);
+        ready = ok;
+        bufUsd = toNum(b);
+      } catch {
+        ready = true; // unknown: let the tx (and its toast) decide
+      }
+      if (!ready) {
+        log({
+          label: "−55%",
+          tone: "bad",
+          txs,
+          text: `Price ${fmtUsd(mid.price)}: CR ${cr(mid.cr)} (${mid.mode}). The Flap tax vault holds ${fmtUsd(bufUsd)} (its buffer fills when SPLIT tax is dispatched), so it cannot cover yet: sUSD redeems pro rata at ${cr(mid.cr)}.`,
+        });
+        return;
+      }
       const r2 = await send({ address: vault!, abi: BackstopVaultAbi, functionName: "cover", args: [pool], label: "Backstop cover" });
       if (r2) txs.push(r2.transactionHash);
       const end = await readState();
@@ -238,11 +261,15 @@ function OnchainScenario({ meta, feed }: { meta: PoolMeta; feed: Address }) {
       log({ label: "Reset", tone: "muted", txs: [r.transactionHash], text: end ? `Price back to the Atlas anchor ${fmtUsd(end.price)}: leverage ${fmtLev(end.lev)}, CR ${cr(end.cr)}.` : "Price back to the Atlas anchor." });
     });
 
+  // Click order matters: −22% runs the sell zone, which moves stock into mUSDC for good, and afterwards even the
+  // feed floor (−60%) leaves CR above 100%. So the gap crash (−55%) comes first, from ~2x; Reset puts the price
+  // back (the pool's C/U are unchanged), then −22% shows the sell zone. Reset again before a retake and re-run
+  // services/scripts/scenario-prep-97.sh after a −22% run.
   const BUTTONS = [
-    { key: "sell", label: "−22%", title: "Sell zone", hint: "Leverage jumps; the pool sells stock for USDC itself.", onClick: sellZone, tone: "text-bad" },
     { key: "cmc", label: "CMC deviation", title: "Breaker", hint: `Price ${Math.max(3, (maxDevBps * 2) / 100).toFixed(0)}% off the CMC reference: minting stops.`, onClick: cmcShock, tone: "text-warn" },
-    { key: "crash", label: "−55%", title: "Backstop cover", hint: canCover ? "Underwater: the Flap tax vault steps in." : "Underwater: shows the loss order.", onClick: crash, tone: "text-bad" },
+    { key: "crash", label: "−55%", title: "Backstop cover", hint: canCover ? "A gap from ~2x: underwater, the Flap tax vault steps in." : "Underwater: shows the loss order.", onClick: crash, tone: "text-bad" },
     { key: "reset", label: "Reset", title: "Back to Atlas", hint: "Price back to the live Atlas anchor.", onClick: reset, tone: "text-ink" },
+    { key: "sell", label: "−22%", title: "Sell zone", hint: "Leverage jumps; the pool sells stock for USDC itself.", onClick: sellZone, tone: "text-bad" },
   ];
   const disabled = !!pending || !!busy || !anchor || !canSet;
 

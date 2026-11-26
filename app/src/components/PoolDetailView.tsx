@@ -92,7 +92,7 @@ export function PoolDetailView({ id, override, hideTrade = false }: { id: string
           <Card>
             {s ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
-                <Stat label="Pool value V" value={fmtUsd(s.V, { compact: true })} sub={`${fmtNum(s.C)} ${m.assetSymbol} + ${fmtUsd(s.U, { compact: true })}`} />
+                <Stat label="Pool value V" value={fmtUsd(s.V, { compact: true })} sub={s.U > 0 ? `${fmtNum(s.C)} ${m.assetSymbol} + ${fmtUsd(s.U, { compact: true })}` : `${fmtNum(s.C)} ${m.assetSymbol}`} />
                 <Stat label={`${m.stableSymbol} supply`} value={fmtUsd(s.S, { compact: true })} tone="stable" sub="$1 claim each" />
                 <Stat label="xSTOCK equity E" value={fmtUsd(s.E, { compact: true })} tone="lever" sub={`${fmtNum(s.X)} ${m.leverSymbol}`} />
                 <Stat label={`${m.leverSymbol} NAV`} value={fmtUsd(s.xNav, { digits: 4 })} tone="lever" />
