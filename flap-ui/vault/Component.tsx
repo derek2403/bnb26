@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Address, VaultComponentProps } from "@/src/sdk";
 import { ZERO_ADDRESS, formatTokenAmount, handleTxError, isActionAvailableForPhase, readTaxVaultHostContext, useFlapSdk } from "@/src/sdk";
-import { Activity, ShieldCheck, ShieldAlert, Wallet } from "lucide-react";
-import { AddressLink, Alert, Card, CardContent, CardHeader, CardTitle, DetailTile, Metric, StatusBadge, TxButton } from "@/src/ui";
+import { Activity, ArrowRight, ShieldCheck, ShieldAlert, Wallet } from "lucide-react";
+import { AddressLink, Alert, Button, Card, CardContent, CardHeader, CardTitle, DetailTile, Metric, StatusBadge, TxButton } from "@/src/ui";
 import type { TxButtonState } from "@/src/ui";
 import { vaultAbi } from "./VaultABI";
 
@@ -12,6 +12,21 @@ import { vaultAbi } from "./VaultABI";
 // Every read and the write target context.vaultAddress only; the defended pool address comes from the vault itself.
 
 const one = 10n ** 18n;
+
+// Same-site path of the SplitStock pool Mini App v2 (mint, redeem, insurance vault).
+const POOL_APP_PATH = "/apps/splitstock";
+
+type HostRedirect = (path: string) => unknown;
+
+// Optional host navigation: use redirect(path) when the Flap host exposes it; otherwise the panel shows the path as text.
+function findHostRedirect(...sources: unknown[]): HostRedirect | null {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+    const candidate = (source as { redirect?: unknown }).redirect;
+    if (typeof candidate === "function") return (path: string) => (candidate as HostRedirect).call(source, path);
+  }
+  return null;
+}
 
 interface VaultSnapshot {
   bufferUsd: bigint | null;
@@ -42,6 +57,7 @@ export default function SplitstockBackstopVault(_props: VaultComponentProps) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txState, setTxState] = useState<TxButtonState>("idle");
+  const [redirectUnavailable, setRedirectUnavailable] = useState(false);
   const resetTimer = useRef<number | null>(null);
 
   const marketPhase = host.marketPhase;
@@ -168,6 +184,20 @@ export default function SplitstockBackstopVault(_props: VaultComponentProps) {
     }
   }
 
+  async function openPoolApp() {
+    const redirect = findHostRedirect(context.host, sdk, context);
+    if (!redirect) {
+      setRedirectUnavailable(true);
+      return;
+    }
+    try {
+      const result = await Promise.resolve(redirect(POOL_APP_PATH));
+      setRedirectUnavailable(result === false);
+    } catch {
+      setRedirectUnavailable(true);
+    }
+  }
+
   const unavailable = t("states.unavailable");
 
   return (
@@ -263,6 +293,19 @@ export default function SplitstockBackstopVault(_props: VaultComponentProps) {
               )}
             </div>
             {error ? <div className="mt-3"><Alert tone="danger">{error}</Alert></div> : null}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-white/10 bg-black/25 p-3 sm:p-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[#eaf1f8]">{t("poolApp.title")}</div>
+              <p className="mt-1 text-xs font-medium leading-5 text-[#7c8899]">
+                {redirectUnavailable ? t("poolApp.fallback", undefined, { path: POOL_APP_PATH }) : t("poolApp.hint")}
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => void openPoolApp()}>
+              {t("poolApp.action")}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>

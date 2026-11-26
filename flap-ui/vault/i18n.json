@@ -1,13 +1,13 @@
 {
   "en": {
-    "title": "SplitStock BackstopVault",
-    "subtitle": "Half of this token's trading tax lands here and defends the sUSD side of its SplitStock pool.",
+    "title": "MORE BackstopVault",
+    "subtitle": "Half of this token's trading tax lands here and defends the sUSD side of its MORE pool.",
     "sections.mechanism": "How the backstop works",
     "sections.primaryAction": "Cover the pool",
     "flow.description": "The vault holds the launch's protocol-owned first-loss xNVDA and accumulates tBNB from the 50% VAULT tax slot. Its buffer is valued with the Atlas BNB/USD feed. Cover limits: at most 50% of the buffer per day for the live pool. The same vault may also cover the team's demo ScenarioPool, whose price is set by the team: at most 20% of the buffer per day and at most 10% of all revenue ever. Flap's Guardian can upgrade the vault implementation through its beacon; there is no other admin.",
     "labels.vault": "Vault",
     "labels.token": "Token",
-    "labels.pool": "Defended SplitStock pool",
+    "labels.pool": "Defended MORE pool",
     "labels.bufferUsd": "Buffer (USD)",
     "labels.poolCr": "Pool collateral ratio",
     "labels.totalDefended": "Total defended",
@@ -43,7 +43,7 @@
     "errors.connectWallet": "Connect a wallet to send cover.",
     "errors.switchNetwork": "Switch to the vault's network before sending cover.",
     "errors.stageUnavailable": "Cover is unavailable in the current market phase.",
-    "errors.noPool": "The SplitStock pool has not been opened yet. Call openPool on the Launcher first.",
+    "errors.noPool": "The MORE pool has not been opened yet. Call openPool on the Launcher first.",
     "errors.ratioUnavailable": "The pool collateral ratio is unavailable right now.",
     "errors.poolHealthy": "The pool's collateral ratio is at or above 100%, so cover is not needed.",
     "errors.txFailed": "The cover transaction failed. Refresh and try again.",
@@ -51,17 +51,21 @@
     "notices.riskMissing": "The host did not supply this Vault's contract risk status. Treat it as unverified.",
     "notices.readsUnavailable": "Vault data is temporarily unavailable.",
     "errors.cannotCover": "The vault cannot cover right now: the buffer is empty, the price is stale, or today's cap is used up.",
-    "states.coverBlocked": "Below 100%, but blocked (see reason)"
+    "states.coverBlocked": "Below 100%, but blocked (see reason)",
+    "poolApp.title": "Use the NVDA pool",
+    "poolApp.hint": "Mint or redeem sUSD and xNVDA, or deposit into the insurance vault, in the MORE pool Mini App.",
+    "poolApp.action": "Use the NVDA pool",
+    "poolApp.fallback": "Open {path} on Flap to use the NVDA pool."
   },
   "zh": {
-    "title": "SplitStock BackstopVault",
-    "subtitle": "此代币一半的交易税进入这里，用于保护其 SplitStock 池的 sUSD 一侧。",
+    "title": "MORE BackstopVault",
+    "subtitle": "此代币一半的交易税进入这里，用于保护其 MORE 池的 sUSD 一侧。",
     "sections.mechanism": "备用金机制",
     "sections.primaryAction": "为池子注资",
     "flow.description": "金库持有本次发射的协议自有首亏 xNVDA，并累积 50% VAULT 税档的 tBNB，缓冲金按 Atlas BNB/USD 计价。注资上限：正式池子每天最多用缓冲金的 50%。同一个金库也可以为团队的演示池 ScenarioPool 注资（价格由团队设定）：每天最多缓冲金的 20%，累计不超过总收入的 10%。Flap 的 Guardian 可以通过 beacon 升级金库实现，除此之外没有其他管理员。",
     "labels.vault": "Vault",
     "labels.token": "代币",
-    "labels.pool": "受保护的 SplitStock 池",
+    "labels.pool": "受保护的 MORE 池",
     "labels.bufferUsd": "备用金（美元）",
     "labels.poolCr": "池抵押率",
     "labels.totalDefended": "累计注资",
@@ -97,7 +101,7 @@
     "errors.connectWallet": "请连接钱包后再发送注资。",
     "errors.switchNetwork": "请先切换到金库所在网络。",
     "errors.stageUnavailable": "当前市场阶段无法注资。",
-    "errors.noPool": "SplitStock 池尚未开启，请先在 Launcher 上调用 openPool。",
+    "errors.noPool": "MORE 池尚未开启，请先在 Launcher 上调用 openPool。",
     "errors.ratioUnavailable": "暂时无法读取池抵押率。",
     "errors.poolHealthy": "池抵押率不低于 100%，无需注资。",
     "errors.txFailed": "注资交易失败，请刷新后重试。",
@@ -105,6 +109,10 @@
     "notices.riskMissing": "Host 未提供此 Vault 的合约风险状态，请视为未验证。",
     "notices.readsUnavailable": "暂时无法读取金库数据。",
     "errors.cannotCover": "金库现在无法注资：缓冲金为空、价格过期，或今日额度已用完。",
-    "states.coverBlocked": "低于 100%，但暂时无法注资（见原因）"
+    "states.coverBlocked": "低于 100%，但暂时无法注资（见原因）",
+    "poolApp.title": "使用 NVDA 池",
+    "poolApp.hint": "在 MORE 池小程序中铸造或赎回 sUSD 和 xNVDA，或存入保险金库。",
+    "poolApp.action": "使用 NVDA 池",
+    "poolApp.fallback": "请在 Flap 上打开 {path} 使用 NVDA 池。"
   }
 }
