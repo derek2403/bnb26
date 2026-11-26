@@ -18,6 +18,9 @@
 //   WAIT_FORCE=1                 if graduation was deferred, wait for forceAt then call Core.migrate
 //   POOL_ID                      slug for deployments pools[] (default tsla-four)
 //   GAS_LIMIT                    gas limit for create / sell-out / migrate (default preset loop.gasLimit)
+//   OF_UI_SIGNER_PRIVATE_KEY     Core create signer when the caller is not it (e.g. a rehearsal wallet); never printed
+//   HIDDEN=1                     mark the pools[] and openfour.tokens[] rows `hidden: true` (rehearsal launches: the
+//                                app lists them nowhere and never treats them as the headline tsla-four pool)
 const path = require("path");
 const { loadPreset, presetAmounts } = require("./lib/preset");
 const { loadRegistration, outDir, signCreate, writeJson, appendWorkbenchToken } = require("./lib/demo");
@@ -197,7 +200,8 @@ async function readPair(hre, pairAddr, memeAddr) {
 async function main() {
   const hre = require("hardhat");
   const { ethers } = hre;
-  const ctx = await connectSplitFork(hre);
+  const uiSigner = process.env.OF_UI_SIGNER_PRIVATE_KEY ? new ethers.Wallet(process.env.OF_UI_SIGNER_PRIVATE_KEY) : undefined;
+  const ctx = await connectSplitFork(hre, { operator: uiSigner?.address });
   const { signer, chainId, core, addresses, deployments, overrides } = ctx;
   const { preset } = loadPreset(SLUG);
   const { registration } = loadRegistration(SLUG);
@@ -233,7 +237,9 @@ async function main() {
   // ------------------------------------------------------------ funds
   const stock = await ethers.getContractAt(ERC20_FULL_ABI, stockAddr, signer);
   const raise = readBaseField(form, "raiseAmount", 18);
-  const need = (raise * 12n) / 10n + amounts.buyAmount / 1000n;
+  // Buying the whole sale costs the raise plus the trade fee; 20% headroom covers the fee and the sell round trip.
+  // (The old "+ buyAmount / 1000" assumed a 0.001 price and asked for 100 tTSLA at the preset's 0.000005.)
+  const need = (raise * 12n) / 10n;
   await ensureStock(hre, stock, signer.address, need, overrides);
   const coreAddr = await core.getAddress();
   if ((await stock.allowance(signer.address, coreAddr)) < need) {
@@ -258,7 +264,7 @@ async function main() {
       form,
       schemas,
     });
-    ({ signature } = await signCreate(signer, chainId, createArgs));
+    ({ signature } = await signCreate(signer, chainId, createArgs, uiSigner));
     try {
       await core.createToken.staticCall(createArgs, signature, { ...overrides, gasLimit, value: BigInt(process.env.CREATE_FEE || "0") });
       break;
@@ -497,6 +503,7 @@ async function main() {
         feed: create.migrate.feed,
         openedBy: migrateAddr,
         openTx: result.migrateTx,
+        ...(process.env.HIDDEN === "1" ? { hidden: true } : {}),
       };
       d.pools = [...d.pools.filter((p) => p.id !== poolId), row];
     }
@@ -515,6 +522,7 @@ async function main() {
       phase: result.phase,
       createTx: result.createTx,
       migrateTx: result.migrateTx,
+      ...(process.env.HIDDEN === "1" ? { hidden: true } : {}),
     };
     d.openfour.tokens = [...tokens.filter((t) => String(t.token).toLowerCase() !== tokenAddr.toLowerCase()), tokenRow];
     d.openfour.backstopTreasury = d.openfour.backstopTreasury || treasury;

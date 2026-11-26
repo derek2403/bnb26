@@ -166,7 +166,9 @@ function txOverrides(chainId, extra = {}) {
 }
 
 /// Connects to OUR fork: refuses mainnets and the shared OpenFour testnet set; requires Registry.owner == signer.
-async function connectSplitFork(hre, { requireCoreSigner = true } = {}) {
+// `operator`: address of a key we hold that owns the Registry and is Core.signer (the team wallet), for runs whose
+// broadcaster is another wallet (rehearsal). Those runs only create/trade; they never write the Registry.
+async function connectSplitFork(hre, { requireCoreSigner = true, operator } = {}) {
   const [signer] = await hre.ethers.getSigners();
   if (!signer) throw new Error("No deployer account. Set DEPLOYER_PRIVATE_KEY (openfour/.env or openfour/startup/.env).");
   const chainId = Number((await hre.ethers.provider.getNetwork()).chainId);
@@ -203,7 +205,8 @@ async function connectSplitFork(hre, { requireCoreSigner = true } = {}) {
 
   const registry = await hre.ethers.getContractAt(REGISTRY_ABI, addresses.registry, signer);
   const owner = await registry.owner();
-  if (owner.toLowerCase() !== signer.address.toLowerCase()) {
+  const ours = (a) => [signer.address, operator].filter(Boolean).some((x) => x.toLowerCase() === String(a).toLowerCase());
+  if (!ours(owner)) {
     throw new Error(`Registry.owner is ${owner}, not ${signer.address}. Only write to a Registry we own.`);
   }
   addresses.core = addresses.core || (await registry.openFourCore());
@@ -218,7 +221,7 @@ async function connectSplitFork(hre, { requireCoreSigner = true } = {}) {
   }
   const tools = await hre.ethers.getContractAt(TOOLS_ABI, addresses.tools, signer);
   const coreSigner = await core.signer();
-  if (requireCoreSigner && coreSigner.toLowerCase() !== signer.address.toLowerCase()) {
+  if (requireCoreSigner && !ours(coreSigner)) {
     throw new Error(`Core.signer is ${coreSigner}, not ${signer.address}. Switch Core.signer back to the deployer before running these scripts.`);
   }
   for (const [k, v] of Object.entries(addresses)) {

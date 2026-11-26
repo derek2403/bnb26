@@ -203,14 +203,16 @@ function encodeFairLaunchParams(overrides = {}) {
   return encodeCreateParams(form, FAIRLAUNCH_OFFLINE_SCHEMAS);
 }
 
-async function signCreate(signer, chainId, createArgs) {
+// `uiSigner` (optional): the Core's create signer when it is not the caller (the fork's signer is the team wallet;
+// a rehearsal wallet creates with the team's signature, as the app's /api/openfour/sign-create route does).
+async function signCreate(signer, chainId, createArgs, uiSigner) {
   const caller = await signer.getAddress();
   const payload = ethers.solidityPacked(
     ["string", "uint256", "address", "bytes32"],
     ["createOpenFourToken", chainId, caller, ethers.keccak256(createArgs)],
   );
   const digest = ethers.keccak256(payload);
-  const signature = await signer.signMessage(ethers.getBytes(digest));
+  const signature = await (uiSigner || signer).signMessage(ethers.getBytes(digest));
   return { caller, digest, signature };
 }
 
