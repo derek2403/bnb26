@@ -1,0 +1,34 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+fs_permissions = [{ access = "read-write", path = "../deployments" }]
+remappings = [
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+  "forge-std/=lib/forge-std/src/",
+  "@openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+  "solady/=lib/solady/src/",
+  # Vendored Atlas pull consumer (BUSL-1.1). Its files use non-relative imports, so they are scoped to lib/atlas-pull.
+  "atlas-pull/=lib/atlas-pull/src/",
+  "lib/atlas-pull/:base/=lib/atlas-pull/src/base/",
+  "lib/atlas-pull/:libraries/=lib/atlas-pull/src/libraries/",
+  "lib/atlas-pull/:interfaces/=lib/atlas-pull/src/interfaces/",
+  "lib/atlas-pull/:constants/=lib/atlas-pull/src/constants/",
+]
+
+[fuzz]
+runs = 512
+
+[invariant]
+runs = 128
+depth = 64
+fail_on_revert = false
+
+[rpc_endpoints]
+bsc_testnet = "${BSC_TESTNET_RPC}"
+bsc = "${BSC_MAINNET_RPC}"
