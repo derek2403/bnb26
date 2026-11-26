@@ -271,9 +271,9 @@ export function waterfall(s0: SimState): { state: SimState; steps: WaterfallStep
     const donate = Math.min(s.vaultBufferUsd, s.S - d.V);
     s.U += donate;
     s.vaultBufferUsd -= donate;
-    steps.push({ step: "BackstopVault cover()", detail: `Swapped launch-tax BNB to ${fmt(donate)} mUSDC and donated it (capped at the deficit).`, crAfter: cr(), done: true });
+    steps.push({ step: "Insurance vault cover()", detail: `Swapped the vault's BNB to ${fmt(donate)} mUSDC and donated it (capped at the deficit).`, crAfter: cr(), done: true });
   } else {
-    steps.push({ step: "BackstopVault cover()", detail: d.V < s.S ? "Buffer is empty." : "Not needed: CR is back above 1.", crAfter: cr(), done: false });
+    steps.push({ step: "Insurance vault cover()", detail: d.V < s.S ? "Buffer is empty." : "Not needed: CR is back above 1.", crAfter: cr(), done: false });
   }
   d = derive(s);
   const payout = s.S > 0 ? Math.min(1, d.V / s.S) : 1;

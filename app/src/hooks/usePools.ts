@@ -98,8 +98,8 @@ function demoMeta(id: string): PoolMeta | undefined {
 
 /** The two real launches the plan defines. Shown as "awaiting launch" until deployments has them. */
 export const EXPECTED_REAL = [
-  { id: "nvda-flap", symbol: "NVDA", kind: "flap" as const, href: "/launch" },
-  { id: "tsla-four", symbol: "TSLA", kind: "four" as const, href: "/memes" },
+  { id: "nvda-flap", symbol: "NVDA", kind: "flap" as const, href: "/" },
+  { id: "tsla-four", symbol: "TSLA", kind: "four" as const, href: "/launchpad" },
 ];
 
 export function listMetas(): { real: PoolMeta[]; pending: typeof EXPECTED_REAL; demo: PoolMeta[] } {
