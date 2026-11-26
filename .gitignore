@@ -1,0 +1,62 @@
+.env
+.env.*
+!.env.example
+node_modules/
+out/
+cache/
+broadcast/
+# legacy per-component forge dirs from the parallel build phase (now: default contracts/out + contracts/cache)
+out-*/
+cache-*/
+
+# --- third-party Solidity libs: reinstall with `make deps` (pinned versions) ---
+contracts/lib/forge-std/
+contracts/lib/openzeppelin-contracts/
+contracts/lib/openzeppelin-contracts-upgradeable/
+contracts/lib/solady/
+# contracts/lib/atlas-pull/ IS committed (vendored Atlas pull consumer, BUSL-1.1)
+
+# --- build outputs ---
+contracts/out*/
+contracts/cache*/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+dist/
+artifacts/
+# fork-deploy/artifacts holds the deploy bytecode the OpenFour fork toolkit needs: keep it
+!openfour/fork-deploy/artifacts/
+typechain-types/
+coverage/
+lcov.info
+flap-ui/.template/
+
+# --- local data / logs (may contain raw API bodies or fork addresses) ---
+# root / services runtime logs only (app/src/app/api/logs is source code)
+/logs/
+services/logs/
+*.log
+services/data/
+openfour/**/workbench/data/
+openfour/fork-deploy/out/
+openfour/startup/out/
+openfour/startup/cache/
+openfour/startup/artifacts/
+app/src/generated/
+services/dist/
+services/raw/
+*.pid
+*.pem
+*.key
+pgdata/
+backups/
+
+# --- secrets & local env ---
+.env.local
+.env.*.local
+.vercel/
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+*.swp

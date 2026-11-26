@@ -1,0 +1,79 @@
+# SplitStock always-on VM (2 vCPU / 4 GB): keeper, agent, api, postgres, caddy.
+#   cp .env.example .env   # fill in keys (server-side only)
+#   docker compose up -d --build
+# The keeper runs every job (mirror, cmc, risk, rebalance, accrue, backstop, openfour, indexer, anchor, mainnet, health).
+# Backup: .github/workflows/keeper-backup.yml runs `keeper once --jobs mirror,rebalance,accrue` every 10 minutes.
+# Nightly backup: run `docker compose exec -T postgres pg_dump -U splitstock splitstock | gzip > backup-$(date +%F).sql.gz`
+# from the host's crontab.
+
+x-services: &services
+  build: ./services
+  image: splitstock-services:latest
+  restart: always
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://splitstock:${POSTGRES_PASSWORD:-splitstock}@postgres:5432/splitstock
+    DEPLOYMENTS_DIR: /app/deployments
+  volumes:
+    - ./deployments:/app/deployments:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: splitstock
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-splitstock}
+      POSTGRES_DB: splitstock
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U splitstock -d splitstock"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keeper:
+    <<: *services
+    command: ["keeper", "run"]
+
+  agent:
+    <<: *services
+    command: ["agent", "run"]
+
+  api:
+    <<: *services
+    command: ["api"]
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-localhost}
+    volumes:
+      - ./services/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
