@@ -18,7 +18,13 @@ export function chainIdOf(kind: ChainKind): number {
 }
 
 export function agentUri(chainId: number): string {
-  return `${env().PUBLIC_BASE_URL.replace(/\/$/, "")}/agent/registration.json?chain=${chainId}`;
+  const base = env().PUBLIC_BASE_URL.replace(/\/$/, "");
+  // A localhost API is not reachable by anyone reading the registry: inline the registration file as a data: URI
+  // (allowed by ERC-8004) instead of publishing a dead link. Set PUBLIC_BASE_URL to the public API to get a URL.
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(base)) {
+    return `data:application/json;base64,${Buffer.from(JSON.stringify(registrationJson(chainId))).toString("base64")}`;
+  }
+  return `${base}/agent/registration.json?chain=${chainId}`;
 }
 
 export function registrationJson(chainId: number) {
