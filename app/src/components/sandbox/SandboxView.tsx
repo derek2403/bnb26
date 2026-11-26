@@ -1,0 +1,434 @@
+"use client";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { erc20Abi, formatUnits, parseEventLogs, parseUnits, type Address, type Hex, type TransactionReceipt } from "viem";
+import { bscTestnet } from "viem/chains";
+import { useAccount, usePublicClient } from "wagmi";
+import { LeveragePoolAbi } from "@/abi";
+import { txUrl } from "@/config/chains";
+import { usePool } from "@/hooks/usePools";
+import { useMySandbox } from "@/hooks/useSandbox";
+import { useSandboxBook } from "@/hooks/useSandboxBook";
+import { describeError, useTx } from "@/hooks/useTx";
+import { fmtLev, fmtNum, fmtPct, fmtUsd, toNum } from "@/lib/format";
+import { Addr, CrGauge, LeverageGauge, ModePill, SplitBar, TickerIcon } from "../ui";
+
+const C = bscTestnet.id;
+const deadline = () => BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
+const minOf = (v: bigint) => (v * 995n) / 1000n;
+
+const ok = (r: TransactionReceipt | null): r is TransactionReceipt => !!r && r.status === "success";
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+type LogRow = { id: number; label: string; text: string; tone: "good" | "bad" | "warn" | "muted"; txs: Hex[] };
+const toneCls = (t: LogRow["tone"]) => (t === "good" ? "text-good" : t === "bad" ? "text-bad" : t === "warn" ? "text-warn" : "text-muted");
+const signed = (n: number, f: (n: number) => string) => (n > 0 ? "+" : n < 0 ? "−" : "") + f(Math.abs(n));
+const usd = (n: number) => fmtUsd(n, { digits: 2 });
+const pct = (n: number) => fmtPct(n, 1);
+
+function Panel({ title, right, children }: { title: ReactNode; right?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-card border border-line bg-surface">
+      <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
+        {right}
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
+
+function Big({ k, v, sub, tone }: { k: string; v: ReactNode; sub?: ReactNode; tone?: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-2xs text-faint">{k}</div>
+      <div className={`num text-lg font-semibold leading-tight ${tone ?? "text-ink"}`}>{v}</div>
+      {sub && <div className="num mt-0.5 text-2xs text-muted">{sub}</div>}
+    </div>
+  );
+}
+
+export function SandboxView() {
+  const { address } = useAccount();
+  // The sandbox belongs to a server-side testnet key (the "market operator"): it moves the price and holds the staked sUSD.
+  const [op, setOp] = useState<{ enabled: boolean; operator: Address | null } | null>(null);
+  useEffect(() => {
+    fetch("/api/sandbox")
+      .then((r) => r.json())
+      .then(setOp)
+      .catch(() => setOp({ enabled: false, operator: null }));
+  }, []);
+  const sb = useMySandbox(op?.operator ?? null);
+  const d = usePool("sandbox", sb.meta);
+  const s = d.snap;
+  const u = d.user;
+  const client = usePublicClient({ chainId: C });
+  const { send, pending } = useTx();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [amount, setAmount] = useState("1");
+  const [log, setLog] = useState<LogRow[]>([]);
+  const book = useSandboxBook(sb.pool, sb.meta?.addresses?.stabilityPool, address, sb.createdAt);
+  const stakerBook = useSandboxBook(sb.pool, sb.meta?.addresses?.stabilityPool, sb.owner, sb.createdAt);
+  const push = (r: Omit<LogRow, "id">) => setLog((x) => [{ ...r, id: Date.now() + Math.random() }, ...x].slice(0, 10));
+  const refresh = useCallback(() => {
+    d.refetch();
+    sb.refetch();
+  }, [d, sb]);
+  const run = async (k: string, fn: () => Promise<void>) => {
+    setBusy(k);
+    try {
+      await fn();
+    } catch (e) {
+      push({ label: k, tone: "bad", txs: [], text: describeError(e) });
+    } finally {
+      setBusy(null);
+      refresh();
+    }
+  };
+  const disabled = !!pending || !!busy;
+  const pool = sb.pool;
+  const a = sb.meta?.addresses;
+
+  // ------------------------------------------------------------- position maths (all in USD)
+  const P = s?.price ?? 0;
+  const nav = s?.xNav ?? 0;
+  const xBal = u ? Number(formatUnits(u.x, 18)) : 0;
+  // Position from the pool's own Minted/Redeemed events: the first-loss seed xNVDA from create() is not counted.
+  const posX = Math.max(0, Math.min(book.x, xBal));
+  const share = book.x > 0 ? posX / book.x : 0;
+  const cIn = book.cIn * share;
+  const usdIn = book.usdIn * share;
+  const entry = cIn > 0 ? usdIn / cIn : 0;
+  const value = posX * nav;
+  const pnl = value - usdIn;
+  const pnlPct = usdIn > 0 ? pnl / usdIn : 0;
+  const move = entry > 0 && P > 0 ? P / entry - 1 : 0;
+  const hold = cIn * P;
+  const holdPnl = hold - usdIn;
+  const hasPos = posX > 1e-9 && usdIn > 0;
+  const live = sb.anchor ?? 0;
+  const vsLive = live > 0 && P > 0 ? P / live - 1 : 0;
+
+  // sUSD owners: the operator wallet staked all the sandbox's sUSD in the insurance pool.
+  const sp = sb.ownerStake;
+  const spS = sp?.deposit ?? 0;
+  const spA = sp?.assetGain ?? 0;
+  const spR = sp?.stableReward ?? 0;
+  const sUSDPrice = s ? Math.min(1, Number.isFinite(s.cr) ? s.cr : 1) : 1;
+  const stakersValue = spS * sUSDPrice + spA * P + spR;
+  const stakedStart = stakerBook.staked > 0 ? stakerBook.staked : spS;
+  const stakersPnl = stakersValue - stakedStart;
+  // Who owns the pool: sUSD owners have a fixed dollar claim, xNVDA holders own the rest; the user's slice of that.
+  const myShare = s && s.X > 0 ? posX / s.X : 0;
+
+  // ------------------------------------------------------------- actions
+  type Api = { ok: boolean; error?: string; txs?: Hex[]; steps?: string[]; price?: number; zone?: { kind: "sell" | "buy"; levBefore?: number; levAfter?: number; sold?: number; out?: number; toStakers?: boolean } };
+  const api = async (body: Record<string, unknown>): Promise<Api> => {
+    const r = await fetch("/api/sandbox", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    return (await r.json()) as Api;
+  };
+
+  const setup = () =>
+    run("setup", async () => {
+      const r = await api({ action: "setup" });
+      if (!r.ok) return push({ label: "Set up", tone: "bad", txs: r.txs ?? [], text: r.error ?? "Setup failed." });
+      push({ label: "Set up", tone: "good", txs: r.txs ?? [], text: r.steps?.length ? `The market operator ${r.steps.join(", ")}.` : "The sandbox is ready." });
+    });
+
+  const approve = async (token: Address, spender: Address, amt: bigint, label: string) => {
+    const cur = (await client!.readContract({ address: token, abi: erc20Abi, functionName: "allowance", args: [address!, spender] })) as bigint;
+    if (cur >= amt) return true;
+    return ok(await send({ address: token, abi: erc20Abi, functionName: "approve", args: [spender, amt], label }));
+  };
+
+  const goLong = () =>
+    run("long", async () => {
+      if (!pool || !a?.asset) return;
+      let amt: bigint;
+      try {
+        amt = parseUnits(amount || "0", d.decimals.asset);
+      } catch {
+        return;
+      }
+      if (amt <= 0n) return;
+      let out: bigint;
+      try {
+        [out] = (await client!.readContract({ address: pool, abi: LeveragePoolAbi, functionName: "previewMintLever", args: [amt] })) as readonly [bigint, bigint];
+      } catch (e) {
+        return push({ label: "Long 2x", tone: "bad", txs: [], text: `The pool won't open a position right now: ${describeError(e)}` });
+      }
+      if (!(await approve(a.asset, pool, amt, "Approve tNVDA"))) return;
+      const r = await send({ address: pool, abi: LeveragePoolAbi, functionName: "mintLever", args: [amt, minOf(out), deadline()], label: "Long 2x" });
+      if (!ok(r)) return;
+      book.addReceipt(r);
+      const ev = parseEventLogs({ abi: LeveragePoolAbi, logs: r.logs, eventName: "Minted", strict: false }).find((e) => e.address.toLowerCase() === pool.toLowerCase());
+      const xOut = ev?.args.out !== undefined ? toNum(ev.args.out) : toNum(out);
+      const price = ev?.args.price !== undefined ? toNum(ev.args.price) : P;
+      const c = toNum(amt, d.decimals.asset);
+      push({ label: "Long 2x", tone: "good", txs: [r.transactionHash], text: `Deposited ${fmtNum(c, 2)} tNVDA (${usd(c * price)} at ${usd(price)}) → ${fmtNum(xOut, 2)} xNVDA.` });
+    });
+
+  const closeAll = () =>
+    run("close", async () => {
+      if (!pool || posX <= 0) return;
+      const x = parseUnits(posX.toFixed(18), 18);
+      const xMax = u && x > u.x ? u.x : x;
+      const [cOut, uOut] = (await client!.readContract({ address: pool, abi: LeveragePoolAbi, functionName: "previewRedeemLever", args: [xMax] })) as readonly [bigint, bigint, bigint];
+      const r = await send({ address: pool, abi: LeveragePoolAbi, functionName: "redeemLever", args: [xMax, minOf(cOut), minOf(uOut)], label: "Close position" });
+      if (!ok(r)) return;
+      book.addReceipt(r);
+      const got = toNum(cOut, d.decimals.asset) * P + toNum(uOut, d.decimals.usdc);
+      push({ label: "Close", tone: got >= usdIn ? "good" : "bad", txs: [r.transactionHash], text: `Closed for ${usd(got)} (${signed(got - usdIn, usd)} on ${usd(usdIn)}).` });
+    });
+
+  // Price moves are signed by the operator key on the server (no wallet popup).
+  const setPrice = (bps: number, label: string) =>
+    run(label, async () => {
+      const r = await api({ action: "move", bps });
+      const txs = r.txs ?? [];
+      if (!r.ok) return push({ label, tone: "bad", txs, text: r.error ?? "The price move failed." });
+      const at = r.price ? `NVDA ${usd(r.price)}` : "NVDA moved";
+      const z = r.zone;
+      if (!z) return push({ label, tone: bps > 0 ? "good" : "bad", txs, text: `${at} (${signed(bps / 10000, pct)} from live).` });
+      const lev = z.levBefore !== undefined && z.levAfter !== undefined ? ` Leverage ${fmtLev(z.levBefore)} → ${fmtLev(z.levAfter)}.` : "";
+      const text =
+        z.kind === "sell"
+          ? z.toStakers && z.sold !== undefined && z.out !== undefined
+            ? `${at}. Leverage went above the band, so the pool sold ${fmtNum(z.sold, 4)} tNVDA to the sUSD owners by itself, for ${fmtNum(z.out, 2)} of their sUSD (at a discount).${lev}`
+            : `${at}. Leverage went above the band, so the pool sold NVDA for dollars by itself.${lev}`
+          : `${at}. Leverage went below the band, so the pool bought NVDA back by itself.${lev}`;
+      push({ label, tone: "warn", txs, text });
+    });
+
+  const backToLive = () =>
+    run("live", async () => {
+      const r = await api({ action: "live" });
+      push(r.ok ? { label: "Live price", tone: "muted", txs: r.txs ?? [], text: "Price back to the live Atlas NVDA price." } : { label: "Live price", tone: "bad", txs: r.txs ?? [], text: r.error ?? "Reset failed." });
+    });
+
+  // ------------------------------------------------------------- render
+  if (!op || (sb.loading && !sb.exists)) {
+    return (
+      <Shell>
+        <Panel title="Loading">
+          <p className="text-sm text-muted">Looking for the sandbox…</p>
+        </Panel>
+      </Shell>
+    );
+  }
+  if (!op.enabled) {
+    return (
+      <Shell>
+        <Panel title="Sandbox operator not configured">
+          <p className="text-sm text-muted">Set SANDBOX_OPERATOR_KEY (a testnet-only key) in the app&apos;s server environment to run the sandbox.</p>
+        </Panel>
+      </Shell>
+    );
+  }
+  if (!sb.exists) {
+    return (
+      <Shell>
+        <Panel title="Open the NVDA sandbox">
+          <p className="max-w-2xl text-sm leading-relaxed text-muted">
+            The sandbox is a copy of the NVDA market on BSC testnet: same contracts and rules, starting at the live Atlas price. Its price can be moved with the buttons on this page, so you can see what a 2x position and the sUSD side do when NVDA goes up or down.
+          </p>
+          <button className="btn-primary mt-4" disabled={disabled} onClick={setup}>
+            {busy === "setup" ? "Setting up (about a minute)…" : "Set up the sandbox"}
+          </button>
+        </Panel>
+        <Log rows={log} />
+      </Shell>
+    );
+  }
+
+  const needsPrep = !!s && !!sp && (s.leverage < 1.8 || (sp.deposit === 0 && sp.assetGain === 0)) && s.X > 0 && posX === 0 && Math.abs(vsLive) < 0.01;
+  const moves = [
+    { k: "+10%", bps: 1000, tone: "text-good" },
+    { k: "−10%", bps: -1000, tone: "text-bad" },
+    { k: "−20%", bps: -2000, tone: "text-bad" },
+  ];
+
+  return (
+    <Shell right={pool ? <Addr a={pool} /> : null}>
+      {/* price strip */}
+      <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-card border border-line bg-surface px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <TickerIcon sym="NVDA" size={32} />
+          <div>
+            <div className="text-[13px] font-semibold text-ink">NVDA · sandbox</div>
+            <div className="text-2xs text-faint">Live price {live ? usd(live) : "…"} (Atlas, at the last reset)</div>
+          </div>
+        </div>
+        <Big k="NVDA price" v={s ? usd(P) : "…"} sub={live ? `${signed(vsLive, pct)} vs live` : undefined} tone={vsLive > 0.0005 ? "text-good" : vsLive < -0.0005 ? "text-bad" : "text-ink"} />
+        <Big k="Pool leverage" v={s ? fmtLev(s.leverage) : "…"} sub={s ? `band ${fmtLev(s.lowerTriggerLev)}–${fmtLev(s.triggerLev)}` : undefined} tone="text-lever" />
+        <Big k="sUSD backing" v={s ? (Number.isFinite(s.cr) ? fmtPct(s.cr, 0) : "∞") : "…"} sub="pool value / sUSD" tone="text-stable" />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <span className="text-2xs text-faint">Move NVDA:</span>
+          {moves.map((m) => (
+            <button key={m.k} className={`btn btn-sm num font-semibold ${m.tone}`} disabled={disabled} onClick={() => setPrice(m.bps, m.k)}>
+              {busy === m.k ? "…" : m.k}
+            </button>
+          ))}
+          <button className="btn btn-sm" disabled={disabled} onClick={backToLive}>
+            {busy === "live" ? "…" : "Live price"}
+          </button>
+        </div>
+      </section>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-4">
+          {/* portfolio */}
+          <Panel title="Your portfolio" right={s ? <ModePill mode={s.mode} /> : null}>
+            {hasPos ? (
+              <>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <Big k="You deposited" v={usd(usdIn)} sub={`${fmtNum(cIn, 2)} tNVDA at ${usd(entry)}`} />
+                  <Big k="Worth now" v={usd(value)} sub={`${fmtNum(posX, 2)} xNVDA × ${fmtUsd(nav, { digits: 4 })}`} />
+                  <Big k="Profit / loss" v={signed(pnl, usd)} sub={signed(pnlPct, pct)} tone={pnl > 0.005 ? "text-good" : pnl < -0.005 ? "text-bad" : "text-ink"} />
+                  <Big k="If you just held NVDA" v={usd(hold)} sub={`${signed(holdPnl, usd)} (${signed(move, pct)})`} tone="text-muted" />
+                </div>
+                <p className="mt-4 rounded border border-line bg-surface2 px-3 py-2 text-[13px] text-ink">
+                  {Math.abs(move) < 0.0005 ? (
+                    <>Your 2x position is open. Move NVDA with the buttons above.</>
+                  ) : (
+                    <>
+                      NVDA moved <b className={move > 0 ? "text-good" : "text-bad"}>{signed(move, pct)}</b>, your position moved <b className={pnlPct > 0 ? "text-good" : "text-bad"}>{signed(pnlPct, pct)}</b> (≈ {fmtLev(Math.abs(move) > 0.001 ? Math.abs(pnlPct / move) : s?.leverage ?? 2)}). No liquidation, no margin call: you just own a bigger or smaller slice of the pool.
+                    </>
+                  )}
+                </p>
+                <div className="mt-3 flex justify-end">
+                  <button className="btn btn-sm" disabled={disabled} onClick={closeAll}>
+                    {busy === "close" ? "Closing…" : `Close for about ${usd(value)}`}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted">{!address ? "Connect your wallet, then deposit tNVDA on the right to open a 2x position." : book.ready ? "No 2x position yet. Deposit tNVDA on the right to open one." : "Reading your position…"}</p>
+            )}
+            {s && (
+              <div className="mt-4 border-t border-line pt-3">
+                <div className="mb-1.5 text-2xs text-faint">Who owns the pool&apos;s {usd(s.V)}</div>
+                <div className="flex h-2.5 overflow-hidden rounded-sm bg-surface2">
+                  <div className="bg-stable" style={{ width: `${s.V > 0 ? Math.min(100, (s.S / s.V) * 100) : 0}%` }} />
+                  <div className="bg-lever" style={{ width: `${s.V > 0 ? Math.max(0, (value / s.V) * 100) : 0}%` }} />
+                  <div className="bg-lever/40" style={{ width: `${s.V > 0 ? Math.max(0, ((s.E - value) / s.V) * 100) : 0}%` }} />
+                </div>
+                <div className="num mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted">
+                  <span><span className="text-stable">■</span> sUSD owners {usd(Math.min(s.S, s.V))} (fixed dollars)</span>
+                  <span><span className="text-lever">■</span> You {usd(value)} ({pct(myShare)} of xNVDA)</span>
+                  <span>Other xNVDA (first-loss seed) {usd(Math.max(0, s.E - value))}</span>
+                </div>
+              </div>
+            )}
+            {u && (
+              <div className="num mt-3 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-faint">
+                <span>Wallet: {fmtNum(toNum(u.asset, d.decimals.asset), 2)} tNVDA</span>
+                <span>{fmtNum(toNum(u.usdc, d.decimals.usdc), 2)} mUSDC</span>
+              </div>
+            )}
+          </Panel>
+
+          {/* stakers */}
+          <Panel title="sUSD owners (staked in the insurance pool)" right={sb.owner ? <Addr a={sb.owner} /> : null}>
+            {spS > 0 || spA > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <Big k="Staked at start" v={`${fmtNum(stakedStart, 2)} sUSD`} sub={usd(stakedStart)} />
+                  <Big k="sUSD they still have" v={`${fmtNum(spS + spR, 2)} sUSD`} sub={`worth ${fmtUsd(sUSDPrice, { digits: 2 })} each`} tone="text-stable" />
+                  <Big k="NVDA they received" v={`${fmtNum(spA, 4)} tNVDA`} sub={usd(spA * P)} />
+                  <Big k="Total value" v={usd(stakersValue)} sub={stakedStart > 0 ? `${signed(stakersPnl, usd)} vs staked` : undefined} tone={stakersPnl >= -0.005 ? "text-good" : "text-bad"} />
+                </div>
+                <p className="mt-4 text-[13px] leading-relaxed text-muted">
+                  {spA > 0
+                    ? "When NVDA fell and leverage left the band, the pool sold NVDA to the sUSD owners at a small discount: their sUSD was swapped for tNVDA, so nobody was liquidated."
+                    : "Stakers hold sUSD, a dollar backed by the pool. If NVDA falls far enough, the pool sells them NVDA at a discount for part of their sUSD."}{" "}
+                  sUSD stays worth $1 while backing is above 100%.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted">No sUSD staked yet.</p>
+            )}
+          </Panel>
+
+          <Log rows={log} />
+        </div>
+
+        <div className="space-y-4">
+          <Panel title={<span className="text-lever">Long 2x</span>}>
+            <label className="text-2xs text-faint" htmlFor="sb-amt">
+              Deposit tNVDA
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <input id="sb-amt" className="input num w-full" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} />
+              <span className="text-xs text-muted">tNVDA</span>
+            </div>
+            <div className="num mt-1 text-2xs text-faint">≈ {usd((Number(amount) || 0) * P)} · fee {s ? fmtPct(s.leverMintFeeBps / 10000, 2) : "–"}</div>
+            <button className="btn-primary mt-3 w-full" disabled={disabled || !s || Math.abs(vsLive) > 0.01} onClick={goLong}>
+              {busy === "long" ? "Opening…" : "Long 2x"}
+            </button>
+            {Math.abs(vsLive) > 0.01 && <p className="mt-2 text-2xs text-warn">Open positions at the live price: new positions are blocked while the price is far from CoinMarketCap.</p>}
+            <p className="mt-3 text-2xs leading-relaxed text-muted">You get xNVDA, which moves about 2x with NVDA. Nobody lends to you, so it is never liquidated.</p>
+          </Panel>
+
+          {needsPrep && (
+            <Panel title="Set up (before the demo)">
+              <button className="btn w-full" disabled={disabled} onClick={setup}>
+                {busy === "setup" ? "Setting up…" : `Set leverage to 2x and stake the sUSD (now ${s ? fmtLev(s.leverage) : "…"})`}
+              </button>
+            </Panel>
+          )}
+
+          {s && (
+            <Panel title="Pool">
+              <div className="space-y-4">
+                <LeverageGauge snap={s} />
+                <CrGauge snap={s} />
+                <SplitBar snap={s} />
+              </div>
+            </Panel>
+          )}
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+function Shell({ children, right }: { children: ReactNode; right?: ReactNode }) {
+  return (
+    <div className="mx-auto max-w-[1280px] px-4 pb-16 pt-5">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight text-ink">Sandbox</h1>
+          <p className="mt-0.5 text-[13px] text-muted">A copy of the NVDA market on BSC testnet. Same contracts, and a price you can move with the buttons below.</p>
+        </div>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Log({ rows }: { rows: LogRow[] }) {
+  if (!rows.length) return null;
+  return (
+    <Panel title="What happened">
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.id} className="rounded border border-line px-3 py-2 text-xs">
+            <span className={toneCls(r.tone)}>
+              <b className="text-ink">{r.label}</b> · {r.text}
+            </span>
+            {r.txs.length > 0 && (
+              <span className="ml-2 inline-flex gap-2">
+                {r.txs.map((h, i) => (
+                  <a key={h} className="num link" href={txUrl(h)} target="_blank" rel="noreferrer">
+                    tx{r.txs.length > 1 ? ` ${i + 1}` : ""} ↗
+                  </a>
+                ))}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}

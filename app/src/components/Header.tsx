@@ -78,6 +78,7 @@ export function Header() {
   const nav = [
     { href: "/", label: "Markets", active: path === "/" },
     { href: trade, label: "Trade", active: path.startsWith("/trade") },
+    { href: "/sandbox", label: "Sandbox", active: path.startsWith("/sandbox") },
     { href: "/launchpad", label: "Launch a market", active: path.startsWith("/launchpad") },
     { href: "/transparency", label: "Transparency", active: path.startsWith("/transparency") },
   ];
