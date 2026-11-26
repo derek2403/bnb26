@@ -123,7 +123,14 @@ async function indexChain(kind: ChainKind, maxRanges = 5) {
   let ranges = 0;
   while (from <= head && ranges < maxRanges) {
     const to = from + BigInt(e.INDEXER_MAX_RANGE) - 1n > head ? head : from + BigInt(e.INDEXER_MAX_RANGE) - 1n;
-    const logs = (await c.getLogs({ address: ws.map((w) => w.address), fromBlock: from, toBlock: to } as Parameters<typeof c.getLogs>[0])) as Log[];
+    // Public RPCs cap eth_getLogs addresses (publicnode: 10 per call), so query the watch list in batches.
+    const logs: Log[] = [];
+    const addrs = ws.map((w) => w.address);
+    for (let i = 0; i < addrs.length; i += e.INDEXER_MAX_ADDRESSES) {
+      const batch = addrs.slice(i, i + e.INDEXER_MAX_ADDRESSES);
+      logs.push(...((await c.getLogs({ address: batch, fromBlock: from, toBlock: to } as Parameters<typeof c.getLogs>[0])) as Log[]));
+    }
+    logs.sort((a, b) => Number((a.blockNumber ?? 0n) - (b.blockNumber ?? 0n)) || (a.logIndex ?? 0) - (b.logIndex ?? 0));
     const rows: Record<string, unknown>[] = [];
     for (const l of logs) {
       const w = byAddr.get(l.address.toLowerCase());

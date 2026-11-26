@@ -9,6 +9,7 @@ import {
   poolFactoryAbi,
   splitLauncherAbi,
 } from "../abi/index.js";
+import { env } from "../config/env.js";
 import { kvGet, kvSet } from "../lib/db.js";
 import { testnet } from "../config/deployments.js";
 import { signer, publicClient, type Signer } from "../lib/chains.js";
@@ -76,7 +77,9 @@ export async function backstopOnce(dryRun = false) {
         tp = undefined;
       }
     }
-    if (tp) out.push(await tryCall(s, tp, flapTaxProcessorAbi, "dispatch", [], dryRun, { launcher: l.launcher }));
+    // FLAP_DISPATCH=false leaves dispatch() to a person (e.g. on camera after the demo's SPLIT trades). Default on:
+    // the keeper moves accrued tax into the BackstopVault every tick (a zero-tax dispatch is a harmless no-op).
+    if (tp && env().FLAP_DISPATCH) out.push(await tryCall(s, tp, flapTaxProcessorAbi, "dispatch", [], dryRun, { launcher: l.launcher }));
     if (l.launcher && hasFn(splitLauncherAbi, "openPool")) {
       try {
         const [launched, opened] = await Promise.all([
