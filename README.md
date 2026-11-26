@@ -2,6 +2,8 @@
 
 **Leverage on real stocks, no liquidations.** MORE splits a tokenized stock into sUSD (a stock-backed dollar) and xSTOCK (about 2x leverage that is never liquidated).
 
+**Live app: https://bnb26.vercel.app** (BSC testnet)
+
 > BNB Hack Bangkok · Developer, CMC × Atlas, Flap and Four.meme tracks. **Status: deployed on BSC testnet; the Flap launch is complete and opened the NVDA pool; the Four.meme (OpenFour) preset is live** (see [Status](#status) and [docs/DEPLOYED.md](./docs/DEPLOYED.md)).
 
 MORE splits a tokenized stock into two tokens:
@@ -42,6 +44,7 @@ Prior art: f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and
 | Deployed on BNB Chain | BSC testnet (chain 97). Addresses: [deployments/97.json](./deployments/97.json) and [docs/DEPLOYED.md](./docs/DEPLOYED.md). NVDA market pool: [`0x0CD8…D208`](https://testnet.bscscan.com/address/0x0CD861cd0dD919434019f18F71630D2F678CD208). RiskOracle: [`0x0411…1190`](https://testnet.bscscan.com/address/0x0411D501839553cc53cbbcE45eD87501DF531190). |
 | Working data calls, verifiable | Each CMC snapshot is posted on-chain as `CmcSnapshot` with `responseHash`, the keccak of the raw CMC response bodies. Every CMC and MCP call is also written to a hash-chained log, and its Merkle root is stored in `LogAnchor` [`0x96b3…3ca0`](https://testnet.bscscan.com/address/0x96b3F4BE973A314E73c9ACA81c206c7Fec5d3ca0). First anchor: 1,050 log entries, root `0x8417b2de…13ac`, tx [`0x8d4ab202…df9a`](https://testnet.bscscan.com/tx/0x8d4ab202858cb22fa80198192fcd2db6e1eea5756d86a7e09da4127511cddf9a). The keeper anchors hourly from then on. The app's Transparency page re-hashes a raw CMC response in the browser and checks it against the on-chain hash. |
 | Code access | This repository is public. |
+| Live demo | https://bnb26.vercel.app (BSC testnet). |
 | Setup instructions | [Setup](#setup) and [Run order](#run-order-bsc-testnet-97) below. |
 | Demo, up to 3 minutes | Script: [docs/DEMO-FLOW.md](./docs/DEMO-FLOW.md). Video link: in the HackQuest submission. |
 | One-page write-up | [docs/WRITEUP.md](./docs/WRITEUP.md): the problem and audience, each feed and endpoint with its on-chain effect, the contract addresses, and what comes next. |

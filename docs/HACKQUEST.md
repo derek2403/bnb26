@@ -90,7 +90,7 @@ f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and a leverage
 - Repo: https://github.com/derek2403/bnb26
 - Demo video: `<VIDEO LINK>`
 - CMC × Atlas write-up: `<WRITE-UP LINK>` (source: [docs/WRITEUP.md](./WRITEUP.md))
-- Live app: `<APP LINK>`
+- Live app: https://bnb26.vercel.app (Markets, Trade, Sandbox, Launch a market, Transparency; BSC testnet)
 - Flap launcher page: https://test.utter.cash/launcher/0x56ceF14ae0171Fb3DFa04DD44EA0811E3D8517c4?chain=bnb-testnet&kind=launcher-detail
 - Address book: [deployments/97.json](../deployments/97.json)
 - Demo script: [docs/DEMO-FLOW.md](./DEMO-FLOW.md)
