@@ -1,0 +1,844 @@
+<title>Leverage Pool Explainer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column; each state view = split bar first, number tiles second, people table last. */
+:root {
+  --bg: #f3f5f6;
+  --surface: #ffffff;
+  --ink: #16202a;
+  --muted: #56636f;
+  --line: #d6dde2;
+  --track: #e7ecef;
+  --stable: #2c6a99;
+  --stable-soft: #dceaf4;
+  --lev: #b8601a;
+  --lev-soft: #f8e6d4;
+  --warn: #b42318;
+  --warn-soft: #fde8e6;
+  --hl: #fff1c2;
+  --hl-ink: #6b4e00;
+  --stock: #5b4f8f;
+  --cash: #2f7d5b;
+  --font-display: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1418; --surface: #161e24; --ink: #e5eaee; --muted: #9ba7b2; --line: #2a353e; --track: #1f2930;
+    --stable: #62a6d9; --stable-soft: #183247; --lev: #ef9a52; --lev-soft: #3d2614;
+    --warn: #f7867a; --warn-soft: #3b1a17; --hl: #3a3010; --hl-ink: #f3d77a; --stock: #a497e0; --cash: #5cc095;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1418; --surface: #161e24; --ink: #e5eaee; --muted: #9ba7b2; --line: #2a353e; --track: #1f2930;
+  --stable: #62a6d9; --stable-soft: #183247; --lev: #ef9a52; --lev-soft: #3d2614;
+  --warn: #f7867a; --warn-soft: #3b1a17; --hl: #3a3010; --hl-ink: #f3d77a; --stock: #a497e0; --cash: #5cc095;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+main { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 66ch; }
+.eyebrow { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.mono, .num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.tok-s { color: var(--stable); font-weight: 600; }
+.tok-x { color: var(--lev); font-weight: 600; }
+.intro { display: flex; flex-direction: column; gap: 14px; }
+.intro p { font-size: 1.08rem; }
+.rule-box { border-left: 4px solid var(--lev); background: var(--surface); padding: 14px 18px; border-radius: 0 8px 8px 0; font-weight: 500; max-width: 66ch; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.r, th.r { text-align: right; }
+.defs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; margin: 0; }
+.defs div { min-width: 0; }
+.defs dt { font-weight: 600; }
+.defs dd { margin: 2px 0 0; color: var(--muted); }
+
+/* Panels */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.step-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.dots { display: flex; gap: 6px; }
+.dot { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); color: var(--muted); font: 500 0.85rem var(--font-data); cursor: pointer; }
+.dot[aria-current="step"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.step-text { display: flex; flex-direction: column; gap: 8px; }
+.key { background: var(--hl); color: var(--hl-ink); padding: 10px 14px; border-radius: 8px; font-weight: 600; max-width: 66ch; }
+.nav { display: flex; gap: 10px; justify-content: space-between; }
+button { font: 500 0.95rem var(--font-body); border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 9px 14px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+:focus-visible { outline: 3px solid var(--stable); outline-offset: 2px; }
+
+/* State view */
+.sv { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+.bar-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.bar-total { font-family: var(--font-data); font-size: 0.95rem; }
+.bar-area { position: relative; padding-top: 22px; }
+.track { position: relative; height: 58px; background: var(--track); border-radius: 6px; overflow: hidden; }
+.seg { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 10px; font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; transition: left .35s ease, width .35s ease; }
+.seg-s { background: var(--stable); color: var(--surface); }
+.seg-x { background: var(--lev); color: var(--surface); }
+.seg-gap { background: repeating-linear-gradient(135deg, var(--warn-soft) 0 6px, transparent 6px 12px); border: 2px dashed var(--warn); color: var(--warn); }
+.owed { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid var(--ink); transition: left .35s ease; pointer-events: none; }
+.owed span { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.72rem; font-weight: 600; white-space: nowrap; color: var(--ink); }
+.owed.l span { transform: translateX(0); } .owed.rr span { transform: translateX(-100%); }
+.ticks { position: relative; height: 20px; margin-top: 4px; }
+.ticks span { position: absolute; top: 0; transform: translateX(-50%); font: 0.72rem var(--font-data); color: var(--muted); white-space: nowrap; }
+.ticks span:first-child { transform: none; } .ticks span:last-child { transform: translateX(-100%); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.9rem; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+.sw-s { background: var(--stable); } .sw-x { background: var(--lev); } .sw-g { border: 2px dashed var(--warn); }
+
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 680px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; background: var(--surface); transition: background .3s; }
+.tile .lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.tile .val { font: 500 1.2rem var(--font-data); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile .f { font: 0.72rem var(--font-data); color: var(--muted); }
+.tile.changed { background: var(--hl); border-color: var(--hl-ink); }
+.tile.changed .lbl::after { content: " · changed"; color: var(--hl-ink); text-transform: none; letter-spacing: 0; }
+.tile.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { from { background: var(--hl); } to { background: var(--surface); } }
+.users td .sub { display: block; font-size: 0.8rem; color: var(--muted); }
+.up { color: var(--stable); } .down { color: var(--warn); }
+
+/* Playground */
+.pg-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 680px) { .pg-grid { grid-template-columns: minmax(0, 1fr); } }
+.ctl { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; background: var(--bg); }
+.price-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.price-big { font: 500 1.6rem var(--font-data); }
+input[type="range"] { width: 100%; accent-color: var(--ink); }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick button { padding: 6px 10px; font-family: var(--font-data); font-size: 0.85rem; }
+.act-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.amt { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); flex: 1 1 140px; min-width: 0; }
+.amt input { border: none; background: transparent; color: var(--ink); font: 1rem var(--font-data); padding: 8px 10px; width: 100%; min-width: 0; }
+.amt input:focus { outline: none; }
+.amt:focus-within { outline: 3px solid var(--stable); outline-offset: 1px; }
+.amt .unit { padding-right: 10px; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+.act-row button { flex: 1 1 160px; }
+.btn-x { border-color: var(--lev); } .btn-s { border-color: var(--stable); }
+.hint { font-size: 0.85rem; color: var(--muted); }
+.hint.bad { color: var(--warn); }
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.92rem; }
+.log li { padding: 8px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.log li:first-child { border-color: var(--ink); }
+.log-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+ul.plain { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+.u { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.sz-table td { white-space: nowrap; }
+/* Table 2 breaks out of the text column: up to 1200px, centered, never wider than the body content box. */
+body { container-type: inline-size; }
+.wide { width: min(1200px, 100cqw); margin-left: calc((100% - min(1200px, 100cqw)) / 2); max-width: none; }
+.sz-table th { white-space: normal; line-height: 1.3; }
+.howto { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.howto ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 2px; }
+.calc { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 0.9rem; display: flex; flex-direction: column; gap: 2px; overflow-x: auto; }
+.calc span { white-space: nowrap; }
+.sz-table td.num, .sz-table th.r { text-align: right; }
+.sz-table tr.sale td { background: var(--hl); color: var(--hl-ink); font-weight: 600; border-bottom: none; }
+.sz-table tr.sale-note td { background: var(--hl); color: var(--hl-ink); font-weight: 600; white-space: normal; text-align: left; padding-top: 0; }
+.sz-pools { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.sz-pool { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sz-row-lbl { font-size: 0.8rem; color: var(--muted); }
+.track.sm { height: 34px; }
+.seg-stock { background: var(--stock); color: var(--surface); }
+.seg-cash { background: var(--cash); color: var(--surface); }
+.sw-stock { background: var(--stock); } .sw-cash { background: var(--cash); }
+@media (prefers-reduced-motion: reduce) { .seg, .owed, .tile { transition: none; } .tile.flash { animation: none; } }
+</style>
+
+<main>
+  <header class="intro">
+    <div class="eyebrow">Explainer · tokenized stock pool</div>
+    <h1>How a two-token leverage pool works</h1>
+    <p>This pool holds one asset, bNVDA, and splits its value between two tokens. Nobody borrows, and nobody has a debt.</p>
+    <p class="rule-box">The one rule: the stable side never changes in USD. So the leveraged side gets all of the pool's gain and all of its loss.</p>
+    <p>Use the walk-through first. Then try your own moves in the playground.</p>
+  </header>
+
+  <section aria-labelledby="h-tokens">
+    <h2 id="h-tokens">The three tokens</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Token</th><th>Who creates it</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><strong>bNVDA</strong></td><td>Binance. The pool never mints it.</td><td>A token that follows the NVDA stock price. The pool holds it. All pool value comes from it.</td></tr>
+          <tr><td><span class="tok-s">sUSD</span></td><td>The pool</td><td>The stable token. Each sUSD is a claim on 1.00 USD of the pool.</td></tr>
+          <tr><td><span class="tok-x">xNVDA</span></td><td>The pool</td><td>The leveraged token. All xNVDA together are a claim on the rest of the pool.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <dl class="defs">
+      <div><dt>Mint</dt><dd>The pool creates new tokens and gives them to the user.</dd></div>
+      <div><dt>Burn</dt><dd>The pool destroys tokens that the user returns.</dd></div>
+      <div><dt>Pool value</dt><dd>The USD value of all bNVDA in the pool. It is C × P.</dd></div>
+      <div><dt>Leverage</dt><dd>How much xNVDA moves for each 1% move of bNVDA. At 2x, a 10% rise gives a 20% rise.</dd></div>
+      <div><dt>Collateral ratio</dt><dd>Pool value ÷ sUSD supply. At 1.00 or more, the pool can pay all sUSD in full.</dd></div>
+      <div><dt>Liquidation</dt><dd>A forced exit. It cannot happen here, because no user has a debt.</dd></div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="h-walk">
+    <h2 id="h-walk">Walk-through: Alice and Bob</h2>
+    <p class="muted">Alice wants more NVDA risk. Bob wants a fixed USD value. Yellow tiles show what changed in each step.</p>
+    <div class="panel">
+      <div class="step-head">
+        <div>
+          <div class="eyebrow" id="step-count">Step 1 of 5</div>
+          <h3 id="step-title"></h3>
+        </div>
+        <div class="dots" id="dots" role="group" aria-label="Choose a step"></div>
+      </div>
+      <div class="step-text" id="step-text" aria-live="polite"></div>
+      <div id="walk-view"></div>
+      <div class="nav">
+        <button id="back" type="button">Back</button>
+        <button id="next" type="button" class="primary">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-play" id="playground">
+    <h2 id="h-play">Playground</h2>
+    <p class="muted">The playground starts from the state after step 2. Move the price, mint, and redeem. "Redeem" means the user returns tokens and gets bNVDA back.</p>
+    <div class="panel">
+      <div class="ctl">
+        <div class="price-row">
+          <label for="price" class="eyebrow">bNVDA price <span class="u">(USD per bNVDA)</span></label>
+          <span class="price-big" id="price-out">100.00 USD</span>
+        </div>
+        <input type="range" id="price" min="30" max="200" step="0.01" value="100" aria-describedby="price-out">
+        <div class="quick">
+          <button type="button" data-move="-0.25">−25%</button>
+          <button type="button" data-move="-0.10">−10%</button>
+          <button type="button" data-move="0.10">+10%</button>
+          <button type="button" data-move="0.25">+25%</button>
+          <button type="button" id="price-reset">Reset price</button>
+        </div>
+      </div>
+      <div class="pg-grid">
+        <div class="ctl">
+          <label for="amt-mx" class="eyebrow">Alice deposits bNVDA</label>
+          <div class="act-row">
+            <div class="amt"><input id="amt-mx" type="number" min="0" step="any" value="5" inputmode="decimal"><span class="unit">bNVDA</span></div>
+            <button type="button" class="btn-x" id="do-mx">Alice mints xNVDA</button>
+          </div>
+          <div class="hint" id="hint-mx"></div>
+        </div>
+        <div class="ctl">
+          <label for="amt-ms" class="eyebrow">Bob deposits bNVDA</label>
+          <div class="act-row">
+            <div class="amt"><input id="amt-ms" type="number" min="0" step="any" value="5" inputmode="decimal"><span class="unit">bNVDA</span></div>
+            <button type="button" class="btn-s" id="do-ms">Bob mints sUSD</button>
+          </div>
+          <div class="hint" id="hint-ms"></div>
+        </div>
+        <div class="ctl">
+          <label for="amt-rx" class="eyebrow">Alice returns xNVDA</label>
+          <div class="act-row">
+            <div class="amt"><input id="amt-rx" type="number" min="0" step="any" value="500" inputmode="decimal"><span class="unit">xNVDA</span></div>
+            <button type="button" class="btn-x" id="do-rx">Alice redeems xNVDA</button>
+          </div>
+          <div class="hint" id="hint-rx"></div>
+        </div>
+        <div class="ctl">
+          <label for="amt-rs" class="eyebrow">Bob returns sUSD</label>
+          <div class="act-row">
+            <div class="amt"><input id="amt-rs" type="number" min="0" step="any" value="500" inputmode="decimal"><span class="unit">sUSD</span></div>
+            <button type="button" class="btn-s" id="do-rs">Bob redeems sUSD</button>
+          </div>
+          <div class="hint" id="hint-rs"></div>
+        </div>
+      </div>
+      <div id="play-view"></div>
+      <div>
+        <div class="log-head">
+          <h3>Event log</h3>
+          <button type="button" id="restart">Start again from step 2</button>
+        </div>
+        <ul class="log" id="log" aria-live="polite"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-why">
+    <h2 id="h-why">Why the leverage changes</h2>
+    <p>Leverage is pool value ÷ xNVDA part, and the sUSD part stays fixed in USD. When bNVDA rises, the xNVDA part grows faster than the pool, so leverage falls. When bNVDA falls, the xNVDA part shrinks faster than the pool, so leverage rises.</p>
+    <p class="key" id="why-fact"></p>
+    <p id="why-detail"></p>
+    <div><button type="button" id="show-50">Show this price in the playground</button></div>
+  </section>
+
+  <section aria-labelledby="h-sell" id="sell-zone">
+    <h2 id="h-sell">The sell zone</h2>
+    <p>When leverage gets too high, the pool sells some bNVDA for USDC, a token worth 1.00 USD. The USDC stays in the pool, and it does not fall when the stock falls. This protects Bob and makes Alice's next loss smaller. The cost is a smaller recovery for Alice when the price rises again.</p>
+    <p class="muted" id="sz-setup"></p>
+    <div class="howto">
+      <h3>How to read the tables</h3>
+      <p>The tables use three kinds of numbers.</p>
+      <ul>
+        <li><strong>A count</strong> tells how many tokens exist. Example: how many bNVDA the pool holds.</li>
+        <li><strong>A price</strong> is the USD for one token. Example: USD per bNVDA.</li>
+        <li><strong>A value</strong> is count × price. It is always in USD.</li>
+      </ul>
+      <p id="sz-howto-lead"></p>
+      <div class="calc" id="sz-howto-calc"></div>
+    </div>
+    <dl class="defs">
+      <div><dt>Stock value</dt><dd>bNVDA in pool × price. Only this part moves with the price.</dd></div>
+      <div><dt>Pool value</dt><dd>Stock value + USDC in pool.</dd></div>
+      <div><dt>Bob and Alice</dt><dd>Bob gets up to 100 USD of the pool value. Alice gets the rest.</dd></div>
+      <div><dt>Leverage here</dt><dd>Stock value ÷ Alice's part. A sale changes bNVDA into USDC. It does not change the pool value.</dd></div>
+    </dl>
+
+    <div class="panel">
+      <div class="price-row">
+        <label for="sz-price" class="eyebrow">NVDA price <span class="u">(USD per bNVDA)</span>, falling slowly from 100 USD</label>
+        <span class="price-big" id="sz-price-out"></span>
+      </div>
+      <input type="range" id="sz-price" min="30" max="100" step="0.01" value="60">
+      <div class="sz-pools">
+        <div class="sz-pool" id="sz-pool-a"></div>
+        <div class="sz-pool" id="sz-pool-b"></div>
+      </div>
+      <p class="hint" id="sz-sales"></p>
+    </div>
+
+    <h3>Table 1. The simple pool, with no sell zone</h3>
+    <div class="table-wrap"><table class="sz-table" id="sz-t1"></table></div>
+    <h3>Table 2. The same fall with the sell zone</h3>
+    <p class="muted">Yellow rows show a sale. Each yellow row shows the state after the sale. The line under it names the sale.</p>
+    <div class="table-wrap wide"><table class="sz-table" id="sz-t2"></table></div>
+    <h3>Table 3. Side by side</h3>
+    <div class="table-wrap"><table class="sz-table" id="sz-t3"></table></div>
+    <h3>If the price returns to 100</h3>
+    <div class="table-wrap"><table class="sz-table" id="sz-t4"></table></div>
+    <p id="sz-return-text"></p>
+    <ul class="plain">
+      <li>The trigger 2.67x and the target 2.00x are example numbers.</li>
+      <li>The tables have no fees and no sale costs.</li>
+      <li>The tables assume a slow fall, so the pool sells exactly at the trigger price.</li>
+      <li>A price jump gives the pool no time to sell. Then only Table 1 applies.</li>
+      <li>This page has no buy zone. The pool does not buy bNVDA back when the price rises.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-not">
+    <h2 id="h-not">Not on this page yet</h2>
+    <ul class="plain">
+      <li>Mint and redeem fees</li>
+      <li>The holding fee</li>
+      <li>The buy zone</li>
+      <li>The closed-market rule</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+// MODEL START
+const EPS = 1e-9;
+const snap = v => (Math.abs(v) < 1e-9 ? 0 : v);
+function newState(price) {
+  return { C: 0, P: price, S: 0, X: 0, users: {
+    alice: { x: 0, s: 0, wallet: 0, dep: 0, depB: 0 },
+    bob:   { x: 0, s: 0, wallet: 0, dep: 0, depB: 0 } } };
+}
+const clone = st => JSON.parse(JSON.stringify(st));
+const poolValue = st => st.C * st.P;
+function sPrice(st) { const V = poolValue(st); if (st.S <= 0) return 1; return V >= st.S ? 1 : V / st.S; }
+function xPrice(st) { if (st.X <= 0) return 1; return Math.max(0, poolValue(st) - st.S) / st.X; }
+function leverage(st) {
+  const V = poolValue(st);
+  if (V <= EPS) return null;
+  if (st.S <= 0) return 1;
+  const rest = V - st.S;
+  return rest <= EPS ? Infinity : V / rest;
+}
+const collRatio = st => (st.S <= 0 ? null : poolValue(st) / st.S);
+const underwater = st => st.S > 0 && poolValue(st) < st.S - EPS;
+const xIsZero = st => st.X > 0 && xPrice(st) <= EPS;
+function fixState(s) { s.C = snap(s.C); s.S = snap(s.S); s.X = snap(s.X);
+  for (const u of Object.values(s.users)) { u.x = snap(u.x); u.s = snap(u.s); } return s; }
+function setPrice(st, p) { const s = clone(st); s.P = p; return s; }
+
+function canMintX(st, d) {
+  if (!(d > 0)) return "Enter an amount above 0.";
+  if (underwater(st)) return "The pool cannot pay sUSD in full. The pool does not mint xNVDA now.";
+  if (xIsZero(st)) return "The xNVDA price is 0. The pool cannot set a mint price.";
+  return null;
+}
+function mintX(st, who, d) {
+  const s = clone(st), xp = xPrice(st), minted = d * st.P / xp;
+  s.C += d; s.X += minted; s.users[who].x += minted; s.users[who].dep += d * st.P; s.users[who].depB += d;
+  return { state: fixState(s), minted, price: xp };
+}
+function canMintS(st, d) {
+  if (!(d > 0)) return "Enter an amount above 0.";
+  if (underwater(st)) return "The pool cannot pay sUSD in full. The pool does not mint sUSD now.";
+  return null;
+}
+function mintS(st, who, d) {
+  const s = clone(st), minted = d * st.P;
+  s.C += d; s.S += minted; s.users[who].s += minted; s.users[who].dep += d * st.P; s.users[who].depB += d;
+  return { state: fixState(s), minted, price: 1 };
+}
+// Treat an amount within 0.005 of the balance as the full balance, so no dust stays behind.
+const fitAmount = (amt, bal) => (Math.abs(amt - bal) < 0.005 ? bal : amt);
+function canRedeemS(st, who, amt) {
+  const bal = st.users[who].s;
+  if (!(amt > 0)) return "Enter an amount above 0.";
+  if (bal <= 0) return "Bob holds no sUSD.";
+  if (fitAmount(amt, bal) > bal) return "Bob holds only " + fmtAmt(bal) + " sUSD.";
+  return null;
+}
+function redeemS(st, who, amt) {
+  amt = fitAmount(amt, st.users[who].s);
+  const s = clone(st), sp = sPrice(st), paid = amt * sp / st.P;
+  s.S -= amt; s.C -= paid; s.users[who].s -= amt; s.users[who].wallet += paid;
+  return { state: fixState(s), burned: amt, paid, price: sp };
+}
+function canRedeemX(st, who, amt) {
+  const bal = st.users[who].x;
+  if (!(amt > 0)) return "Enter an amount above 0.";
+  if (bal <= 0) return "Alice holds no xNVDA.";
+  if (fitAmount(amt, bal) > bal) return "Alice holds only " + fmtAmt(bal) + " xNVDA.";
+  if (xIsZero(st)) return "The xNVDA price is 0. A redeem pays nothing now.";
+  return null;
+}
+function redeemX(st, who, amt) {
+  amt = fitAmount(amt, st.users[who].x);
+  const s = clone(st), xp = xPrice(st), paid = amt * xp / st.P;
+  s.X -= amt; s.C -= paid; s.users[who].x -= amt; s.users[who].wallet += paid;
+  return { state: fixState(s), burned: amt, paid, price: xp };
+}
+function userValue(st, who) {
+  const u = st.users[who];
+  const xv = u.x > 0 ? u.x * xPrice(st) : 0;
+  return xv + u.s * sPrice(st) + u.wallet * st.P;
+}
+function userChange(st, who) { const d = st.users[who].dep; return d > 0 ? (userValue(st, who) - d) / d : null; }
+
+function buildWalkthrough() {
+  const out = [{ state: newState(100) }];
+  let r = mintX(out[0].state, "alice", 10); out.push({ state: r.state, r });
+  r = mintS(r.state, "bob", 10); out.push({ state: r.state, r });
+  out.push({ state: setPrice(r.state, 110) });
+  r = redeemS(out[3].state, "bob", 1000); out.push({ state: r.state, r });
+  r = redeemX(r.state, "alice", 1000); out.push({ state: r.state, r });
+  return out;
+}
+
+const fmt = (v, d) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtAmt = v => (Math.abs(v - Math.round(v)) < 0.005 ? fmt(Math.round(v), 0) : fmt(v, 2));
+const fmtUsd = v => fmtAmt(v) + " USD";
+const fmtPrice = v => fmt(v, 2) + " USD";
+const fmtLev = l => (l === null ? "—" : l === Infinity ? "no limit" : fmt(l, 2) + "x");
+const fmtPct = p => (p === null ? "—" : (p > 0.00005 ? "+" : p < -0.00005 ? "−" : "") + fmt(Math.abs(p) * 100, 1) + "%");
+// MODEL END
+
+/* ---------- State view ---------- */
+function createStateView(root, opts) {
+  root.innerHTML = `
+  <div class="sv">
+    <div class="warn" hidden></div>
+    <div>
+      <div class="bar-head"><span class="eyebrow">Pool value, split by claim</span><span class="bar-total"></span></div>
+      <div class="bar-area">
+        <div class="track" role="img">
+          <div class="seg seg-s"></div><div class="seg seg-x"></div><div class="seg seg-gap"></div>
+        </div>
+        <div class="owed"><span>sUSD owed</span></div>
+      </div>
+      <div class="ticks"></div>
+      <div class="legend">
+        <span><i class="sw sw-s"></i><span class="lg-s"></span></span>
+        <span><i class="sw sw-x"></i><span class="lg-x"></span></span>
+        <span class="lg-gap-wrap"><i class="sw sw-g"></i><span class="lg-g"></span></span>
+      </div>
+    </div>
+    <div class="tiles"></div>
+    <div class="table-wrap"><table class="users">
+      <thead><tr><th>Person</th><th>Holds</th><th class="r">Value now <span class="u">(USD)</span></th><th class="r">Deposited <span class="u">(USD)</span></th><th class="r">Change <span class="u">(%)</span></th></tr></thead>
+      <tbody></tbody></table></div>
+  </div>`;
+  const q = s => root.querySelector(s);
+  const tileDefs = [
+    ["price", "bNVDA price", "P", "(USD per bNVDA)"], ["C", "bNVDA in pool", "C", "(bNVDA)"], ["V", "Pool value", "V = C × P", "(USD)"], ["S", "sUSD supply", "S", "(sUSD)"],
+    ["X", "xNVDA supply", "X", "(xNVDA)"], ["xp", "xNVDA price", "(V − S) ÷ X", "(USD per xNVDA)"], ["lev", "Leverage", "V ÷ (V − S)", "(times)"], ["cr", "Collateral ratio", "V ÷ S", "(times)"]];
+  const tilesEl = q(".tiles"), tiles = {};
+  for (const [k, lbl, f, unit] of tileDefs) {
+    const t = document.createElement("div"); t.className = "tile";
+    t.innerHTML = `<span class="lbl">${lbl} <span class="u">${unit}</span></span><span class="val"></span><span class="f">${f}</span>`;
+    tilesEl.appendChild(t); tiles[k] = t;
+  }
+  let lastVals = null;
+  function tileValues(st) {
+    const cr = collRatio(st);
+    return { price: fmtPrice(st.P), C: fmt(st.C, 2), V: fmtUsd(poolValue(st)), S: fmtAmt(st.S), X: fmtAmt(st.X),
+      xp: st.X > 0 ? fmtPrice(xPrice(st)) : "1.00 USD", lev: fmtLev(leverage(st)), cr: cr === null ? "none" : fmt(cr, 2) + "x" };
+  }
+  function holds(u, who) {
+    const parts = [];
+    if (u.x > 0) parts.push(fmtAmt(u.x) + " xNVDA");
+    if (u.s > 0) parts.push(fmtAmt(u.s) + " sUSD");
+    if (u.wallet > 0) parts.push(fmt(u.wallet, 2) + " bNVDA back in wallet");
+    return parts.length ? parts.join("<span class='sub'></span>") : "nothing yet";
+  }
+  return function update(st, prevSt, mode, scale) {
+    const V = poolValue(st), S = st.S;
+    const pct = v => Math.max(0, Math.min(100, v / scale * 100));
+    const sPart = Math.min(V, S), xPart = Math.max(0, V - S), gap = Math.max(0, S - V);
+    const segS = q(".seg-s"), segX = q(".seg-x"), segG = q(".seg-gap");
+    segS.style.left = "0%"; segS.style.width = pct(sPart) + "%";
+    segX.style.left = pct(sPart) + "%"; segX.style.width = pct(xPart) + "%";
+    segG.style.left = pct(V) + "%"; segG.style.width = pct(gap) + "%"; segG.hidden = gap <= EPS;
+    segS.textContent = pct(sPart) > 14 ? "sUSD" : ""; segX.textContent = pct(xPart) > 14 ? "xNVDA" : "";
+    segG.textContent = pct(gap) > 18 ? "Shortfall" : "";
+    const owed = q(".owed"), op = pct(S);
+    owed.hidden = S <= 0; owed.style.left = op + "%";
+    owed.classList.toggle("l", op < 12); owed.classList.toggle("rr", op > 88);
+    q(".bar-total").textContent = "Total " + fmtUsd(V);
+    q(".track").setAttribute("aria-label", `Pool value ${fmtUsd(V)}. sUSD part ${fmtUsd(sPart)}. xNVDA part ${fmtUsd(xPart)}.` + (gap > EPS ? ` Shortfall ${fmtUsd(gap)}.` : ""));
+    const ticks = q(".ticks"); ticks.innerHTML = "";
+    for (let i = 0; i <= 4; i++) { const sp = document.createElement("span"); sp.style.left = (i * 25) + "%"; sp.textContent = fmtAmt(scale * i / 4) + (i === 4 ? " USD" : ""); ticks.appendChild(sp); }
+    q(".lg-s").innerHTML = `sUSD part (fixed): <span class="num">${fmtUsd(sPart)}</span>`;
+    q(".lg-x").innerHTML = `xNVDA part (the rest): <span class="num">${fmtUsd(xPart)}</span>`;
+    q(".lg-gap-wrap").hidden = gap <= EPS;
+    q(".lg-g").innerHTML = `Shortfall: <span class="num">${fmtUsd(gap)}</span>`;
+
+    const warn = q(".warn");
+    if (opts.warnings && underwater(st)) {
+      warn.hidden = false;
+      warn.textContent = `The pool cannot pay sUSD in full. Each sUSD now gets ${fmtPrice(sPrice(st))}, not 1.00 USD. The xNVDA price is 0.`;
+    } else if (opts.warnings && xIsZero(st)) {
+      warn.hidden = false;
+      warn.textContent = "The xNVDA price is 0. The pool value only covers the sUSD supply. Nothing is left for xNVDA holders.";
+    } else warn.hidden = true;
+
+    const vals = tileValues(st);
+    const base = prevSt ? tileValues(prevSt) : lastVals;
+    for (const k in tiles) {
+      tiles[k].querySelector(".val").textContent = vals[k];
+      const changed = base && base[k] !== vals[k];
+      if (mode === "persist") tiles[k].classList.toggle("changed", !!changed);
+      else if (mode === "flash" && changed) { tiles[k].classList.remove("flash"); void tiles[k].offsetWidth; tiles[k].classList.add("flash"); }
+    }
+    lastVals = vals;
+
+    const tb = q(".users tbody"); tb.innerHTML = "";
+    for (const [who, name] of [["alice", "Alice"], ["bob", "Bob"]]) {
+      const u = st.users[who], ch = userChange(st, who);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><strong>${name}</strong><span class="sub">${who === "alice" ? "chose leveraged" : "chose stable"}</span></td>
+        <td>${holds(u, who)}</td>
+        <td class="r num">${u.dep > 0 ? fmtUsd(userValue(st, who)) : "—"}</td>
+        <td class="r num">${u.dep > 0 ? fmtUsd(u.dep) + `<span class="sub">${fmt(u.depB, 2)} bNVDA</span>` : "—"}</td>
+        <td class="r num ${ch > 0.00005 ? "up" : ch < -0.00005 ? "down" : ""}">${fmtPct(ch)}</td>`;
+      tb.appendChild(tr);
+    }
+  };
+}
+
+/* ---------- Walk-through ---------- */
+const W = buildWalkthrough();
+const s = i => W[i].state;
+const P0 = s(2).P, P1 = s(3).P;
+const steps = [
+  { title: "Alice mints xNVDA", text: () => {
+      const r = W[1].r, st = s(1);
+      return [`Alice deposits ${fmtAmt(st.users.alice.depB)} bNVDA. The price is ${fmtPrice(st.P)}, so her deposit is worth ${fmtUsd(st.users.alice.dep)}.`,
+        `She chooses "leveraged". The pool has no xNVDA yet, so the first mint price is ${fmtPrice(r.price)}.`,
+        `The pool mints ${fmtAmt(r.minted)} xNVDA for Alice. No sUSD exists, so leverage is ${fmtLev(leverage(st))}.`,
+        { key: "With no sUSD, xNVDA moves exactly like bNVDA." }]; } },
+  { title: "Bob mints sUSD", text: () => {
+      const r = W[2].r, st = s(2), V = poolValue(st);
+      return [`Bob deposits ${fmtAmt(st.users.bob.depB)} bNVDA and chooses "stable". The pool mints ${fmtAmt(r.minted)} sUSD for Bob, one for each USD.`,
+        `The pool now holds ${fmtAmt(st.C)} bNVDA, worth ${fmtUsd(V)}. It owes ${fmtUsd(st.S)} to sUSD holders.`,
+        `The rest, ${fmtUsd(V - st.S)}, belongs to xNVDA. So the xNVDA price stays at ${fmtPrice(xPrice(st))}.`,
+        `But leverage is now ${fmtLev(leverage(st))}. Alice's ${fmtUsd(V - st.S)} now carries the price risk of ${fmtUsd(V)} of bNVDA.`,
+        { key: "Bob's mint creates Alice's leverage." }]; } },
+  { title: "The NVDA price rises", text: () => {
+      const st = s(3), V = poolValue(st), move = (P1 - P0) / P0;
+      return [`The NVDA price rises ${fmtPct(move).replace("+", "")}, from ${fmtPrice(P0)} to ${fmtPrice(P1)}. The pool value becomes ${fmtUsd(V)}.`,
+        `The pool still owes ${fmtUsd(st.S)} to sUSD holders. The rest, ${fmtUsd(V - st.S)}, belongs to xNVDA. So the xNVDA price is ${fmtPrice(xPrice(st))}.`,
+        `The pool does not mint or burn any token. Only the price changed.`,
+        `Alice's value rises from ${fmtUsd(userValue(s(2), "alice"))} to ${fmtUsd(userValue(st, "alice"))}. Leverage falls to ${fmtLev(leverage(st))}, because the xNVDA part is now larger.`,
+        { key: `Alice gains ${fmtPct(userChange(st, "alice")).replace("+", "")} on a ${fmtPct(move).replace("+", "")} price move.` }]; } },
+  { title: "Bob redeems sUSD", text: () => {
+      const r = W[4].r, st = s(4);
+      return [`Bob returns ${fmtAmt(r.burned)} sUSD. The pool burns them and pays him ${fmtUsd(r.burned * r.price)} in bNVDA.`,
+        `At ${fmtPrice(st.P)} for each bNVDA, that is ${fmt(r.paid, 2)} bNVDA.`,
+        `Bob deposited ${fmtAmt(st.users.bob.depB)} bNVDA and gets back ${fmt(r.paid, 2)} bNVDA. This is correct.`,
+        `Bob chose a dollar position. He gets back the same USD value, not the same bNVDA count. No sUSD remains, so leverage is ${fmtLev(leverage(st))}.`,
+        { key: "The stable side gets back dollars, not bNVDA." }]; } },
+  { title: "Alice redeems xNVDA", text: () => {
+      const r = W[5].r, st = s(5);
+      const bobGave = st.users.bob.depB - st.users.bob.wallet;
+      return [`Alice returns ${fmtAmt(r.burned)} xNVDA. The pool burns them and pays her ${fmtUsd(r.burned * r.price)} in bNVDA.`,
+        `That is ${fmt(r.paid, 2)} bNVDA. She deposited ${fmtAmt(st.users.alice.depB)} bNVDA.`,
+        `Bob gave up ${fmt(bobGave, 2)} bNVDA. That bNVDA went to Alice.`,
+        `The pool is now empty. Each person got back the claim that they chose.`,
+        { key: `The ${fmt(bobGave, 2)} bNVDA that Bob gave up is Alice's gain.` }]; } },
+];
+const walkUpdate = createStateView(document.getElementById("walk-view"), { warnings: false });
+const dotsEl = document.getElementById("dots");
+steps.forEach((st, i) => {
+  const b = document.createElement("button"); b.type = "button"; b.className = "dot"; b.textContent = i + 1;
+  b.setAttribute("aria-label", "Step " + (i + 1) + ": " + st.title); b.onclick = () => showStep(i); dotsEl.appendChild(b);
+});
+let stepIdx = 0;
+function showStep(i) {
+  stepIdx = i;
+  document.getElementById("step-count").textContent = `Step ${i + 1} of ${steps.length}`;
+  document.getElementById("step-title").textContent = steps[i].title;
+  document.getElementById("step-text").innerHTML = steps[i].text().map(t => typeof t === "string" ? `<p>${t}</p>` : `<p class="key">${t.key}</p>`).join("");
+  walkUpdate(s(i + 1), s(i), "persist", 2500);
+  [...dotsEl.children].forEach((d, j) => { if (j === i) d.setAttribute("aria-current", "step"); else d.removeAttribute("aria-current"); });
+  document.getElementById("back").disabled = i === 0;
+  document.getElementById("next").disabled = i === steps.length - 1;
+}
+document.getElementById("back").onclick = () => showStep(Math.max(0, stepIdx - 1));
+document.getElementById("next").onclick = () => showStep(Math.min(steps.length - 1, stepIdx + 1));
+showStep(0);
+
+/* ---------- Playground ---------- */
+const BASE_SCALE = 4000;
+let pg = clone(s(2)), scale = BASE_SCALE, priceAtLog = pg.P;
+const playUpdate = createStateView(document.getElementById("play-view"), { warnings: true });
+const $ = id => document.getElementById(id);
+const logEl = $("log");
+function log(msg) {
+  const li = document.createElement("li"); li.textContent = msg; logEl.prepend(li);
+  while (logEl.children.length > 8) logEl.lastChild.remove();
+}
+function levMsg(a, b) {
+  const la = leverage(a), lb = leverage(b);
+  if (fmtLev(la) === fmtLev(lb)) return `Leverage stayed at ${fmtLev(lb)}.`;
+  const rose = (lb === null ? 0 : lb) > (la === null ? 0 : la);
+  return `Leverage ${rose ? "rose" : "fell"} from ${fmtLev(la)} to ${fmtLev(lb)}.`;
+}
+function fitScale(st) {
+  const need = Math.max(poolValue(st), st.S);
+  if (need > scale) scale = Math.ceil(need * 1.15 / 1000) * 1000;
+}
+const num = id => parseFloat($(id).value);
+function render(prev, mode) {
+  fitScale(pg);
+  playUpdate(pg, prev, mode, scale);
+  $("price").value = pg.P; $("price-out").textContent = fmtPrice(pg.P);
+  const checks = [
+    ["mx", canMintX(pg, num("amt-mx")), num("amt-mx") > 0 && !canMintX(pg, num("amt-mx")) ? `Mint price now: ${fmtPrice(pg.X > 0 ? xPrice(pg) : 1)} per xNVDA.` : ""],
+    ["ms", canMintS(pg, num("amt-ms")), `Bob gets ${fmtAmt(Math.max(0, num("amt-ms") || 0) * pg.P)} sUSD at this price.`],
+    ["rx", canRedeemX(pg, "alice", num("amt-rx")), `Alice holds ${fmtAmt(pg.users.alice.x)} xNVDA.`],
+    ["rs", canRedeemS(pg, "bob", num("amt-rs")), `Bob holds ${fmtAmt(pg.users.bob.s)} sUSD.`],
+  ];
+  for (const [k, err, ok] of checks) {
+    $("do-" + k).disabled = !!err;
+    const h = $("hint-" + k); h.textContent = err || ok; h.classList.toggle("bad", !!err);
+  }
+}
+function act(fn) { const prev = pg; const msg = fn(); render(prev, "flash"); if (msg) log(msg); }
+$("do-mx").onclick = () => act(() => { const d = num("amt-mx"); if (canMintX(pg, d)) return; const before = pg, r = mintX(pg, "alice", d); pg = r.state;
+  return `Pool minted ${fmtAmt(r.minted)} xNVDA for Alice at ${fmtPrice(r.price)} each. ${levMsg(before, pg)}`; });
+$("do-ms").onclick = () => act(() => { const d = num("amt-ms"); if (canMintS(pg, d)) return; const before = pg, r = mintS(pg, "bob", d); pg = r.state;
+  return `Pool minted ${fmtAmt(r.minted)} sUSD for Bob. ${levMsg(before, pg)}`; });
+$("do-rx").onclick = () => act(() => { const a = num("amt-rx"); if (canRedeemX(pg, "alice", a)) return; const before = pg, r = redeemX(pg, "alice", a); pg = r.state;
+  return `Pool burned ${fmtAmt(r.burned)} xNVDA from Alice and paid her ${fmt(r.paid, 2)} bNVDA (${fmtUsd(r.paid * before.P)}). ${levMsg(before, pg)}`; });
+$("do-rs").onclick = () => act(() => { const a = num("amt-rs"); if (canRedeemS(pg, "bob", a)) return; const before = pg, r = redeemS(pg, "bob", a); pg = r.state;
+  return `Pool burned ${fmtAmt(r.burned)} sUSD from Bob and paid him ${fmt(r.paid, 2)} bNVDA (${fmtUsd(r.paid * before.P)}). ${levMsg(before, pg)}`; });
+["amt-mx", "amt-ms", "amt-rx", "amt-rs"].forEach(id => $(id).addEventListener("input", () => render(null, "none")));
+
+const PMIN = 30, PMAX = 200;
+const clampP = p => Math.round(Math.min(PMAX, Math.max(PMIN, p)) * 100) / 100;
+function priceLog() {
+  if (Math.abs(pg.P - priceAtLog) < 0.005) return;
+  const before = setPrice(pg, priceAtLog);
+  const xa = before.X > 0 ? fmtPrice(xPrice(before)) : "—", xb = pg.X > 0 ? fmtPrice(xPrice(pg)) : "—";
+  log(`bNVDA price moved from ${fmtPrice(priceAtLog)} to ${fmtPrice(pg.P)}. xNVDA price moved from ${xa} to ${xb}. ${levMsg(before, pg)}`);
+  priceAtLog = pg.P;
+}
+function movePrice(p) { const prev = pg; pg = setPrice(pg, clampP(p)); render(prev, "flash"); priceLog(); }
+$("price").addEventListener("input", e => { pg = setPrice(pg, parseFloat(e.target.value)); render(null, "none"); });
+$("price").addEventListener("change", () => priceLog());
+document.querySelectorAll("[data-move]").forEach(b => b.onclick = () => movePrice(pg.P * (1 + parseFloat(b.dataset.move))));
+$("price-reset").onclick = () => movePrice(100);
+function restart(price) {
+  pg = setPrice(clone(s(2)), price); scale = BASE_SCALE; priceAtLog = pg.P; logEl.innerHTML = "";
+  render(null, "none");
+  log(price === 100 ? "The playground starts from step 2. Alice holds 1,000 xNVDA and Bob holds 1,000 sUSD."
+    : `The playground starts from step 2 with the price at ${fmtPrice(price)}.`);
+}
+$("restart").onclick = () => restart(100);
+restart(100);
+
+/* ---------- Why section, from the model ---------- */
+(function () {
+  const start = s(2), lev0 = leverage(start), zeroP = start.P * (1 - 1 / lev0), at = setPrice(start, zeroP);
+  const fall = (start.P - zeroP) / start.P;
+  $("why-fact").textContent = `At a ${fmtLev(lev0)} start, a ${fmt(fall * 100, 0)}% fall takes xNVDA to zero.`;
+  $("why-detail").textContent = `In step 2, the pool holds ${fmtUsd(poolValue(start))} and owes ${fmtUsd(start.S)}. At ${fmtPrice(zeroP)}, the pool holds ${fmtUsd(poolValue(at))}. The sUSD part needs all of it, so the xNVDA price is ${fmtPrice(xPrice(at))}. Below that price, each sUSD gets less than 1.00 USD.`;
+  $("show-50").textContent = `Show ${fmtPrice(zeroP)} in the playground`;
+  $("show-50").onclick = () => { restart(clampP(zeroP)); $("playground").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); };
+})();
+
+// SELL MODEL START
+// A small pool, separate from the playground. q = bNVDA, u = USDC, p = price, S = Bob's fixed claim.
+const SZ = { q0: 2, p0: 100, S: 100, trigger: 8 / 3, target: 2 };
+function szVals(st) {
+  const stock = st.q * st.p, V = stock + st.u, alice = Math.max(0, V - SZ.S), bob = Math.min(SZ.S, V);
+  return { stock, V, alice, bob, lev: alice > 1e-9 ? stock / alice : null };
+}
+// Price where leverage = trigger: q*p = T*(q*p + u - S)  =>  p = T*(S - u) / (q*(T - 1)).
+function szTriggerPrice(st) {
+  if (st.q <= 0 || SZ.S - st.u <= 0) return null;
+  return SZ.trigger * (SZ.S - st.u) / (st.q * (SZ.trigger - 1));
+}
+function szSell(st) {
+  const v = szVals(st), usd = v.stock - SZ.target * v.alice, qty = usd / st.p;
+  return { state: { q: st.q - qty, u: st.u + usd, p: st.p }, qty, usd };
+}
+// Moves the price along `path` in order. On a fall, the pool sells at each trigger price it passes.
+function szRun(path, sellZone) {
+  let st = { q: SZ.q0, u: 0, p: path[0] };
+  const events = [];
+  for (let i = 1; i < path.length; i++) {
+    const to = path[i];
+    if (sellZone && to < st.p) {
+      for (;;) {
+        const pt = szTriggerPrice(st);
+        if (pt === null || pt > st.p + 1e-9 || pt < to - 1e-9) break;
+        st = { ...st, p: pt };
+        const r = szSell(st);
+        events.push({ p: pt, qty: r.qty, usd: r.usd, after: r.state });
+        st = r.state;
+      }
+    }
+    st = { ...st, p: to };
+  }
+  return { state: st, events };
+}
+// SELL MODEL END
+
+(function sellZone() {
+  const f2 = v => fmt(v, 2), f3 = v => fmt(v, 3), levTxt = v => (v.lev === null ? "no value left" : fmt(v.lev, 2) + "x");
+  const grid = [100, 90, 80, 70, 60, 50, 40];
+  const start = szVals({ q: SZ.q0, u: 0, p: SZ.p0 });
+  $("sz-setup").textContent = `This example uses a small pool, separate from the playground. The pool holds ${fmtAmt(SZ.q0)} bNVDA at ${fmtPrice(SZ.p0)}, so it is worth ${fmtUsd(start.V)}. Bob holds ${fmtAmt(SZ.S)} sUSD. Alice holds the leveraged side, worth ${fmtUsd(start.alice)}. The pool sells when leverage reaches ${fmt(SZ.trigger, 2)}x (the trigger). It sells until leverage is ${fmt(SZ.target, 2)}x (the target).`;
+  const head = cols => `<thead><tr>${cols.map((c, i) => { const [t, u] = Array.isArray(c) ? c : [c, ""];
+    return `<th${i ? ' class="r"' : ""}>${t}${u ? `<br><span class="u">(${u})</span>` : ""}</th>`; }).join("")}</tr></thead>`;
+  const fu = v => f2(v) + " USD";
+  const fc = f2; // table cells: the unit is in the column header
+  const PRICE = ["NVDA price", "USD per bNVDA"];
+  const td = v => `<td class="num">${v}</td>`;
+
+  // Worked row for "How to read the tables": the state just after the first sale.
+  const w = szRun([SZ.p0, grid[grid.length - 1]], true).events[0], wv = szVals(w.after);
+  $("sz-howto-lead").textContent = `Example: the row at ${fu(w.p)} per bNVDA in Table 2, just after the sale.`;
+  $("sz-howto-calc").innerHTML = [
+    `${f2(w.after.q)} bNVDA × ${f2(w.p)} USD per bNVDA = ${fu(wv.stock)} of stock`,
+    `+ ${fu(w.after.u)} in USDC = ${fu(wv.V)} pool value`,
+    `− ${fu(SZ.S)} owed to Bob = ${fu(wv.alice)} for Alice`,
+    `Leverage = ${f2(wv.stock)} ÷ ${f2(wv.alice)} = ${f2(wv.lev)} times`].map(t => `<span>${t}</span>`).join("");
+
+  // Table 1
+  let rows = grid.map(p => {
+    const v = szVals(szRun([SZ.p0, p], false).state);
+    return `<tr>${td(fc(p))}${td(fc(v.V))}${td(fc(v.bob))}${td(fc(v.alice))}${td(fmt((start.alice - v.alice) / start.alice * 100, 1) + "%")}${td(levTxt(v))}</tr>`;
+  });
+  $("sz-t1").innerHTML = head([PRICE, ["Pool value", "USD"], ["Bob", "USD"], ["Alice", "USD"], ["Alice's loss", "%"], ["Leverage", "times"]]) + `<tbody>${rows.join("")}</tbody>`;
+
+  // Table 2: grid rows plus one row for each sale, merged when a sale happens at a grid price.
+  const low = grid[grid.length - 1], events = szRun([SZ.p0, low], true).events;
+  const items = grid.map(p => ({ p, ev: null }));
+  for (const ev of events) {
+    const same = items.find(it => Math.abs(it.p - ev.p) < 0.005);
+    if (same) same.ev = ev; else items.push({ p: ev.p, ev });
+  }
+  items.sort((a, b) => b.p - a.p);
+  rows = items.map(it => {
+    const st = it.ev ? it.ev.after : szRun([SZ.p0, it.p], true).state, v = szVals(st);
+    const row = `<tr${it.ev ? ' class="sale"' : ""}>${td(fc(it.p))}${td(f3(st.q))}${td(fc(v.stock))}${td(fc(st.u))}${td(fc(v.V))}${td(fc(v.bob))}${td(fc(v.alice))}${td(levTxt(v))}</tr>`;
+    if (!it.ev) return row;
+    return row + `<tr class="sale-note"><td colspan="8">Leverage reached ${fmt(SZ.trigger, 2)} times. Pool sells ${f3(it.ev.qty)} bNVDA for ${f2(it.ev.usd)} USDC. Leverage returns to ${fmt(v.lev, 2)} times.</td></tr>`;
+  });
+  $("sz-t2").innerHTML = head([PRICE, ["bNVDA in pool", "bNVDA"], ["Stock value", "USD"], ["USDC in pool", "USD"], ["Pool value", "USD"], ["Bob", "USD"], ["Alice", "USD"], ["Leverage", "times"]]) + `<tbody>${rows.join("")}</tbody>`;
+
+  // Table 3
+  rows = grid.map(p => {
+    const a = szVals(szRun([SZ.p0, p], false).state), b = szVals(szRun([SZ.p0, p], true).state);
+    return `<tr>${td(fc(p))}${td(fc(a.alice))}${td(fc(b.alice))}${td(fc(a.bob))}${td(fc(b.bob))}</tr>`;
+  });
+  $("sz-t3").innerHTML = head([PRICE, ["Alice, no sell zone", "USD"], ["Alice, sell zone", "USD"], ["Bob, no sell zone", "USD"], ["Bob, sell zone", "USD"]]) + `<tbody>${rows.join("")}</tbody>`;
+
+  // Return to 100 after a fall to 60
+  const lowP = 60, back = [SZ.p0, lowP, SZ.p0];
+  const ra = szRun(back, false).state, rb = szRun(back, true).state, rbLow = szRun([SZ.p0, lowP], true).state;
+  const va = szVals(ra), vb = szVals(rb);
+  $("sz-t4").innerHTML = head(["Pool", ["bNVDA in pool", "bNVDA"], ["USDC in pool", "USD"], ["Pool value at 100", "USD"], ["Bob", "USD"], ["Alice", "USD"]]) + `<tbody>
+    <tr><td>No sell zone</td>${td(f3(ra.q))}${td(fc(ra.u))}${td(fc(va.V))}${td(fc(va.bob))}${td(fc(va.alice))}</tr>
+    <tr><td>Sell zone, back from ${fu(lowP)}</td>${td(f3(rb.q))}${td(fc(rb.u))}${td(fc(vb.V))}${td(fc(vb.bob))}${td(fc(vb.alice))}</tr></tbody>`;
+  $("sz-return-text").textContent = `With the sell zone, the pool holds ${f3(rbLow.q)} bNVDA and ${f2(rbLow.u)} USDC at ${f2(lowP)} USD. The pool sold stock at a low price, so less stock rises for Alice.`;
+
+  // Slider with two bars per pool
+  const SCALE = start.V;
+  function poolView(el, name, st) {
+    const v = szVals(st), pc = x => Math.max(0, Math.min(100, x / SCALE * 100));
+    const gap = Math.max(0, SZ.S - v.V);
+    const lbl = (w, t) => (w > 16 ? t : "");
+    el.innerHTML = `<h3>${name}</h3>
+      <span class="sz-row-lbl">What the pool holds</span>
+      <div class="track sm" role="img" aria-label="${name}: stock ${f2(v.stock)} USD, USDC ${f2(st.u)} USD">
+        <div class="seg seg-stock" style="left:0;width:${pc(v.stock)}%">${lbl(pc(v.stock), "bNVDA")}</div>
+        <div class="seg seg-cash" style="left:${pc(v.stock)}%;width:${pc(st.u)}%">${lbl(pc(st.u), "USDC")}</div></div>
+      <span class="sz-row-lbl">Who owns it</span>
+      <div class="track sm" role="img" aria-label="${name}: Bob ${f2(v.bob)} USD, Alice ${f2(v.alice)} USD">
+        <div class="seg seg-s" style="left:0;width:${pc(v.bob)}%">${lbl(pc(v.bob), "Bob")}</div>
+        <div class="seg seg-x" style="left:${pc(v.bob)}%;width:${pc(v.alice)}%">${lbl(pc(v.alice), "Alice")}</div>
+        ${gap > 1e-9 ? `<div class="seg seg-gap" style="left:${pc(v.V)}%;width:${pc(gap)}%">${lbl(pc(gap), "Bob's shortfall")}</div>` : ""}</div>
+      <div class="legend">
+        <span><i class="sw sw-stock"></i>bNVDA <span class="num">${f3(st.q)} bNVDA = ${fu(v.stock)}</span></span>
+        <span><i class="sw sw-cash"></i>USDC <span class="num">${fu(st.u)}</span></span>
+        <span><i class="sw sw-s"></i>Bob <span class="num">${fu(v.bob)}</span></span>
+        <span><i class="sw sw-x"></i>Alice <span class="num">${fu(v.alice)}</span></span>
+        <span>Leverage <span class="num">${levTxt(v)}</span></span>
+        ${gap > 1e-9 ? `<span><i class="sw sw-g"></i>Shortfall <span class="num">${fu(gap)}</span></span>` : ""}
+      </div>`;
+  }
+  function draw() {
+    const p = parseFloat($("sz-price").value);
+    $("sz-price-out").textContent = fmtPrice(p);
+    poolView($("sz-pool-a"), "No sell zone", szRun([SZ.p0, p], false).state);
+    const run = szRun([SZ.p0, p], true);
+    poolView($("sz-pool-b"), "With sell zone", run.state);
+    $("sz-sales").textContent = run.events.length
+      ? `The sell-zone pool sold ${run.events.length} time${run.events.length > 1 ? "s" : ""} on the way down, at ${run.events.map(e => fmtPrice(e.p)).join(", ")}.`
+      : "The sell-zone pool has not sold yet. Leverage is below the trigger.";
+  }
+  $("sz-price").addEventListener("input", draw);
+  draw();
+})();
+</script>
