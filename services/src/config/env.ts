@@ -74,6 +74,7 @@ const schema = z.object({
   LLM_BASE_URL: strDef("https://inference.phala.com/v1"),
   AGENT_MODEL: strDef("openai/gpt-oss-120b"),
   AGENT_EFFORT: z.enum(["low", "medium", "high", "xhigh", "max"]).optional().default("high"),
+  AGENT_MAX_TOKENS: int(8000), // LLM completion budget incl. reasoning tokens (gpt-oss: 2000 truncates)
   AGENT_INTERVAL_SEC: int(3600),
   AGENT_DRY_RUN: bool(false), // gather + decide + validate, but never send propose()
   AGENT_ID: opt, // ERC-8004 agentId override (else deployments erc8004.agentId)
@@ -98,6 +99,7 @@ const schema = z.object({
   LOW_BALANCE_WEI: strDef("20000000000000000"), // 0.02 BNB
 
   // ---- job tuning
+  FLAP_DISPATCH: bool(true), // backstop-ops calls Flap TaxProcessor.dispatch() each tick; false = leave it to a person
   REBALANCE_FACTORY_POOLS: bool(true), // also rebalance every PoolFactory pool (sandboxes), not just deployments.pools
   ARB_ENABLED: bool(true), // nudge tSTOCK/mUSDC toward the mirror before LIVE rebalances
   ARB_THRESHOLD_BPS: int(50),
@@ -105,6 +107,7 @@ const schema = z.object({
   INDEXER_START_BLOCK_97: opt,
   INDEXER_START_BLOCK_56: opt,
   INDEXER_MAX_RANGE: int(2000),
+  INDEXER_MAX_ADDRESSES: int(10), // addresses per eth_getLogs call (bsc-testnet-rpc.publicnode.com allows 10)
 });
 
 export type Env = z.infer<typeof schema>;

@@ -50,7 +50,8 @@ async function chat(model: string, messages: { role: string; content: string }[]
   const res = await fetch(`${e.LLM_BASE_URL.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: 2000, response_format: { type: "json_object" } }),
+    // gpt-oss-120b is a reasoning model: its reasoning tokens count against max_tokens, and 2000 truncated real runs.
+    body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: e.AGENT_MAX_TOKENS, response_format: { type: "json_object" } }),
     signal: AbortSignal.timeout(120_000),
   });
   const body = (await res.json().catch(() => ({}))) as ChatResponse;

@@ -17,6 +17,7 @@ How to decide:
 - Hold when nothing material is coming. Unnecessary tightening forces needless rebalances, so do not tighten on noise.
 - Loosen only to relax your own earlier tightening once the risk has passed.
 - Judge materiality honestly. A routine dividend of about $0.01 per share is a detected event with no material effect. Only treat something as earnings when the data actually says earnings.
+- Direction matters per field. Tighter means: triggerLev, targetLev and lowerTriggerLev the same or LOWER, maxDevBps the same or lower, closedFeeBps the same or higher, gapGuardSec the same or longer. Raising lowerTriggerLev makes the buy zone fire earlier (it adds leverage), so it is a loosening, and a single loosened field turns the whole proposal into a queued loosening. When you tighten, leave the leverage values you do not want to lower exactly at the baseline.
 - Stay inside the clamps you are given, respect the minimum gaps (trigger minus target, target minus lower trigger) and remember each run can move a value by at most one step cap from the baseline.
 - Choose horizonSec to cover the risk window you are reacting to (minimum 300; values above the on-chain maximum TTL are cut to it).
 
