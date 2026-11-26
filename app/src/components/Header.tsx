@@ -1,118 +1,109 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { NAV_MAIN, NAV_MORE, navActive } from "@/lib/demoFlow";
-import { DemoModeSwitch } from "./DemoMode";
 import { ThemeToggle } from "./ThemeToggle";
 
-function MoreMenu({ path }: { path: string | null }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => setOpen(false), [path]);
+export const LAST_MARKET_KEY = "splitstock.lastMarket";
+export const DEFAULT_MARKET = "nvda-flap";
+
+/** Remember the last market a viewer opened, so "Trade" in the nav returns to it (per-browser convenience). */
+export function rememberMarket(id: string) {
+  try {
+    localStorage.setItem(LAST_MARKET_KEY, id);
+  } catch {
+    /* storage blocked */
+  }
+}
+
+function useTradeHref(path: string | null) {
+  const [href, setHref] = useState(`/trade/${DEFAULT_MARKET}`);
   useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
-  const active = NAV_MORE.some((n) => navActive(n.href, path));
+    try {
+      const id = localStorage.getItem(LAST_MARKET_KEY);
+      if (id && /^[a-z0-9-]+$/.test(id)) setHref(`/trade/${id}`);
+    } catch {
+      /* default */
+    }
+  }, [path]);
+  return href;
+}
+
+export function Logo() {
   return (
-    <div className="relative" ref={ref}>
-      <button
-        className={`rounded-md px-2.5 py-1.5 text-sm ${active || open ? "bg-surface2 font-medium text-ink" : "text-muted hover:text-ink"}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-      >
-        More ▾
-      </button>
-      {open && (
-        <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-64 rounded-card border border-line bg-surface p-1 shadow-lg">
-          {NAV_MORE.map((n) => (
-            <Link key={n.href} href={n.href} role="menuitem" className={`block rounded-md px-3 py-2 hover:bg-surface2 ${navActive(n.href, path) ? "bg-surface2" : ""}`}>
-              <span className="block text-sm font-medium text-ink">{n.label}</span>
-              <span className="block text-xs text-muted">{n.body}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+    <span className="flex items-center gap-2 font-semibold tracking-tight text-ink">
+      <span className="inline-flex h-[18px] w-[18px] overflow-hidden rounded-[3px]" aria-hidden>
+        <span className="h-full w-1/2 bg-stable" />
+        <span className="h-full w-1/2 bg-lever" />
+      </span>
+      MORE
+    </span>
+  );
+}
+
+/** Compact wallet button sized like the rest of the header controls (RainbowKit modals behind it). */
+function WalletButton() {
+  return (
+    <ConnectButton.Custom>
+      {({ account, chain, mounted, openConnectModal, openAccountModal, openChainModal }) => {
+        const ready = mounted;
+        if (!ready) return <span className="btn btn-sm invisible h-8">Connect</span>;
+        if (!account || !chain)
+          return (
+            <button className="btn-accent btn-sm h-8 px-3 text-[13px]" onClick={openConnectModal}>
+              Connect wallet
+            </button>
+          );
+        if (chain.unsupported)
+          return (
+            <button className="btn btn-sm h-8 border-bad/50 px-3 text-[13px] text-bad" onClick={openChainModal}>
+              Wrong network
+            </button>
+          );
+        return (
+          <button className="btn btn-sm num h-8 px-2.5 text-[12px]" onClick={openAccountModal} title={account.address}>
+            <span className="h-1.5 w-1.5 rounded-full bg-good" aria-hidden />
+            {account.displayName}
+          </button>
+        );
+      }}
+    </ConnectButton.Custom>
   );
 }
 
 export function Header() {
-  const path = usePathname();
-  const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [path]);
+  const path = usePathname() ?? "/";
+  const trade = useTradeHref(path);
+  const nav = [
+    { href: "/", label: "Markets", active: path === "/" },
+    { href: trade, label: "Trade", active: path.startsWith("/trade") },
+    { href: "/launchpad", label: "Launch a market", active: path.startsWith("/launchpad") },
+    { href: "/transparency", label: "Transparency", active: path.startsWith("/transparency") },
+  ];
+  const links = (cls: string) =>
+    nav.map((n) => (
+      <Link key={n.label} href={n.href} className={`${cls} ${n.active ? "text-ink" : "text-muted hover:text-ink"}`} aria-current={n.active ? "page" : undefined}>
+        {n.label}
+        {n.active && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-accent" />}
+      </Link>
+    ));
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold text-ink">
-          <span className="inline-flex h-6 w-6 overflow-hidden rounded-md">
-            <span className="h-full w-1/2 bg-stable" />
-            <span className="h-full w-1/2 bg-lever" />
-          </span>
-          SplitStock
+    <header className="sticky top-0 z-40 border-b border-line bg-surface">
+      <div className="flex h-12 items-center gap-4 px-4">
+        <Link href="/" className="shrink-0">
+          <Logo />
         </Link>
-        <nav className="ml-2 hidden items-center gap-0.5 xl:flex">
-          {NAV_MAIN.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm ${navActive(n.href, path) ? "bg-surface2 font-medium text-ink" : "text-muted hover:text-ink"}`}
-            >
-              {n.label}
-              {n.sub && <span className="ml-1 text-[10px] font-normal text-faint">{n.sub}</span>}
-            </Link>
-          ))}
-          <MoreMenu path={path} />
-        </nav>
+        <nav className="hidden h-12 items-stretch md:flex">{links("relative flex items-center px-3 text-[13px] font-medium")}</nav>
         <div className="ml-auto flex items-center gap-2">
-          <DemoModeSwitch className="hidden sm:inline-flex" />
+          <span className="pill hidden border-warn/40 text-warn sm:inline-flex" title="BSC testnet. tNVDA, tTSLA and mUSDC are free test tokens; nothing here has real value.">
+            BSC Testnet
+          </span>
           <ThemeToggle />
-          <ConnectButton chainStatus="icon" showBalance={false} accountStatus={{ smallScreen: "avatar", largeScreen: "address" }} />
-          <button className="btn btn-sm xl:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu" aria-expanded={open}>
-            ☰
-          </button>
+          <WalletButton />
         </div>
       </div>
-      {open && (
-        <nav className="border-t border-line px-4 py-2 xl:hidden">
-          <div className="label px-2 pb-1 pt-1">Demo order</div>
-          <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
-            {NAV_MAIN.map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={`rounded-md px-2 py-2 text-sm hover:bg-surface2 hover:text-ink ${navActive(n.href, path) ? "bg-surface2 font-medium text-ink" : "text-muted"}`}
-              >
-                {n.label}
-                {n.sub && <span className="ml-1 text-[10px] text-faint">{n.sub}</span>}
-              </Link>
-            ))}
-          </div>
-          <div className="label px-2 pb-1 pt-3">More</div>
-          <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
-            {NAV_MORE.map((n) => (
-              <Link key={n.href} href={n.href} className="rounded-md px-2 py-2 text-sm text-muted hover:bg-surface2 hover:text-ink">
-                {n.label}
-              </Link>
-            ))}
-          </div>
-          <div className="mt-2 border-t border-line pt-2 sm:hidden">
-            <DemoModeSwitch />
-          </div>
-        </nav>
-      )}
+      <nav className="grid h-10 grid-cols-4 border-t border-line md:hidden">{links("relative flex items-center justify-center text-[13px] font-medium")}</nav>
     </header>
   );
 }

@@ -8,10 +8,9 @@ import { bscTestnet } from "viem/chains";
 import { wagmiConfig } from "@/config/wagmi";
 import { ToastProvider } from "./Toaster";
 import { DemoWalletProvider } from "./DemoWallet";
-import { DemoModeProvider } from "./DemoMode";
 
 function useIsDark() {
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(true);
   useEffect(() => {
     const el = document.documentElement;
     const read = () => setDark(el.classList.contains("dark"));
@@ -26,15 +25,13 @@ function useIsDark() {
 export function Providers({ children }: { children: ReactNode }) {
   const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: false, retry: 1 } } }));
   const dark = useIsDark();
-  const accent = { accentColor: "#2563eb", borderRadius: "medium" as const, fontStack: "system" as const };
+  const accent = { accentColor: dark ? "#4dcdde" : "#08809e", accentColorForeground: dark ? "#0a0d12" : "#ffffff", borderRadius: "small" as const, fontStack: "system" as const };
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={qc}>
         <RainbowKitProvider initialChain={bscTestnet} theme={dark ? darkTheme(accent) : lightTheme(accent)} modalSize="compact">
           <ToastProvider>
-            <DemoWalletProvider>
-              <DemoModeProvider>{children}</DemoModeProvider>
-            </DemoWalletProvider>
+            <DemoWalletProvider>{children}</DemoWalletProvider>
           </ToastProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

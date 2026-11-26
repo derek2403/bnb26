@@ -1,62 +1,41 @@
 "use client";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { addressUrl } from "@/config/chains";
-import { fmtAge, fmtBps, fmtDuration, fmtLev, fmtPct, fmtUsd, short } from "@/lib/format";
+import { fmtBps, fmtDuration, fmtLev, fmtPct, fmtUsd, short } from "@/lib/format";
 import type { ModeName, PoolSnapshot } from "@/lib/types";
 
-export function MockBanner() {
+export function Card({ title, right, children, className = "", pad = true }: { title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; pad?: boolean }) {
   return (
-    <div className="border-b border-line bg-lever-soft/60 px-4 py-1.5 text-center text-[11px] text-ink/80">
-      <span className="font-semibold">MOCK · TESTNET</span> · tNVDA, tTSLA and mUSDC are test tokens. sUSD and xSTOCK here have no value. No
-      real-money pool exists.
-    </div>
-  );
-}
-
-export function PageHeader({ title, lede, right }: { title: string; lede?: ReactNode; right?: ReactNode }) {
-  return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
-        {lede && <p className="mt-1 max-w-3xl text-sm text-muted">{lede}</p>}
-      </div>
-      {right}
-    </div>
-  );
-}
-
-export function Card({ title, right, children, className = "" }: { title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section className={`card ${className}`}>
+    <section className={`rounded-card border border-line bg-surface ${className}`}>
       {(title || right) && (
-        <div className="mb-3 flex items-center justify-between gap-2">
-          {title && <h2 className="card-title">{title}</h2>}
+        <div className="flex min-h-[40px] items-center justify-between gap-2 border-b border-line px-4 py-2">
+          {title && <h2 className="text-[13px] font-semibold text-ink">{title}</h2>}
           {right}
         </div>
       )}
-      {children}
+      <div className={pad ? "p-4" : ""}>{children}</div>
     </section>
   );
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "stable" | "lever" | "good" | "bad" | "warn" }) {
+export function Stat({ label, value, sub, tone, size = "md" }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: "stable" | "lever" | "good" | "bad" | "warn"; size?: "sm" | "md" | "lg" }) {
   const color = tone === "stable" ? "text-stable" : tone === "lever" ? "text-lever" : tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : tone === "warn" ? "text-warn" : "text-ink";
+  const fs = size === "lg" ? "text-xl" : size === "sm" ? "text-sm" : "text-base";
   return (
     <div className="min-w-0">
       <div className="label">{label}</div>
-      <div className={`num mt-1 truncate text-lg font-semibold ${color}`}>{value}</div>
+      <div className={`num mt-0.5 truncate font-medium ${fs} ${color}`}>{value}</div>
       {sub && <div className="mt-0.5 truncate text-xs text-muted">{sub}</div>}
     </div>
   );
 }
 
-export function KV({ k, v, mono = true }: { k: ReactNode; v: ReactNode; mono?: boolean }) {
+export function KV({ k, v, mono = true, tone }: { k: ReactNode; v: ReactNode; mono?: boolean; tone?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1 text-sm">
+    <div className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
       <span className="text-muted">{k}</span>
-      <span className={`${mono ? "num" : ""} truncate text-right text-ink`}>{v}</span>
+      <span className={`${mono ? "num" : ""} truncate text-right ${tone ?? "text-ink"}`}>{v}</span>
     </div>
   );
 }
@@ -70,70 +49,71 @@ export function Addr({ a, chainId, label }: { a?: string; chainId?: number; labe
   );
 }
 
-export function LaunchpadBadge({ label, short = false }: { label: string; short?: boolean }) {
-  const tone = label === "Flap" ? "border-lever/40 text-lever" : label === "Four.meme" ? "border-good/40 text-good" : "";
+export function Change({ v, digits = 2, className = "" }: { v: number | undefined | null; digits?: number; className?: string }) {
+  if (v === undefined || v === null || !Number.isFinite(v)) return <span className={`num text-faint ${className}`}>–</span>;
+  const tone = v > 0 ? "text-good" : v < 0 ? "text-bad" : "text-muted";
   return (
-    <span className={`pill ${tone}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {short ? label : `Opened by ${label}`}
+    <span className={`num ${tone} ${className}`}>
+      {v > 0 ? "+" : ""}
+      {(v * 100).toFixed(digits)}%
+    </span>
+  );
+}
+
+/** Stocks with a logo in public/logos (company logos from the tokenized-stock listings on CoinMarketCap). */
+const LOGOS = new Set(["NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AVGO", "NFLX", "COIN", "MSTR", "AMD"]);
+
+export function TickerIcon({ sym, size = 28 }: { sym: string; size?: number }) {
+  const base = sym.toUpperCase().replace(/^X/, "");
+  if (LOGOS.has(base)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={`/logos/${base}.png`} alt={`${base} logo`} width={size} height={size} className="shrink-0 rounded-full border border-line" style={{ width: size, height: size }} />
+    );
+  }
+  return (
+    <span className="num flex shrink-0 items-center justify-center rounded-full border border-line bg-surface2 font-semibold text-ink" style={{ width: size, height: size, fontSize: size <= 24 ? 9 : 10 }}>
+      {sym.slice(0, 4)}
+    </span>
+  );
+}
+
+/** "Opened by Flap" / "Opened by Four.meme" source badge. */
+export function SourceBadge({ label, short: compact = false }: { label: string; short?: boolean }) {
+  return (
+    <span className="pill">
+      <span className={`h-1.5 w-1.5 rounded-full ${label === "Flap" ? "bg-lever" : label === "Four.meme" ? "bg-stable" : "bg-faint"}`} />
+      {compact ? label : `Opened by ${label}`}
     </span>
   );
 }
 
 const MODE_STYLE: Record<ModeName, string> = {
   UNSEEDED: "text-faint",
-  NORMAL: "text-good",
+  NORMAL: "text-muted",
   STABILITY: "text-warn",
   UNDERWATER: "text-bad",
   NO_PRICE: "text-bad",
 };
+const MODE_LABEL: Record<ModeName, string> = { UNSEEDED: "Unseeded", NORMAL: "Normal", STABILITY: "Stability mode", UNDERWATER: "Underwater", NO_PRICE: "No price" };
 
 export function ModePill({ mode }: { mode: ModeName }) {
   return (
-    <span className="pill">
-      <span className={`h-1.5 w-1.5 rounded-full bg-current ${MODE_STYLE[mode]}`} />
-      <span className={MODE_STYLE[mode]}>{mode.replace("_", " ")}</span>
+    <span className={`pill ${MODE_STYLE[mode]}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {MODE_LABEL[mode]}
     </span>
   );
 }
 
-export function MarketPill({ open, gapGuard, nextOpen, nextClose, now, feeBps }: { open: boolean; gapGuard: boolean; nextOpen?: number; nextClose?: number; now: number; feeBps?: number }) {
-  const label = open ? "Market open" : gapGuard ? "Pre-open gap guard" : "Market closed";
-  const tone = open ? "bg-good" : gapGuard ? "bg-warn" : "bg-faint";
+export function MarketStatusPill({ label, open, halfDay, gapGuard, feeBps, nextOpen, nextClose, now }: { label: string; open: boolean; halfDay?: boolean; gapGuard?: boolean; feeBps?: number; nextOpen?: number; nextClose?: number; now: number }) {
+  const dot = open ? (halfDay ? "bg-warn" : "bg-good") : gapGuard ? "bg-warn" : "bg-faint";
   const when = open && nextClose ? `closes in ${fmtDuration(nextClose - now)}` : !open && nextOpen ? `opens in ${fmtDuration(nextOpen - now)}` : "";
   return (
-    <span className="pill" title={`NYSE hours from the on-chain MarketCalendar. ${open ? "Open-market mint fee applies." : "Closed-market mint fee and leverage cap apply."}${when ? ` NYSE ${when}.` : ""}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${tone}`} />
+    <span className="pill" title={`NYSE hours from the on-chain MarketCalendar.${when ? ` ${when}.` : ""} ${open ? "Open-market" : "Closed-market"} mint fee applies.`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
       <span className="text-ink">{label}</span>
       {feeBps !== undefined && <span>· {fmtBps(feeBps)} fee</span>}
-      {when && <span className="hidden text-faint sm:inline">· {when}</span>}
-    </span>
-  );
-}
-
-/** Mint fee base for the market pill: the RiskOracle open/closed fee when known, else the current sUSD mint fee. */
-export function marketFeeBps(snap: PoolSnapshot): number {
-  const base = snap.marketOpen ? snap.openFeeBps : snap.closedFeeBps;
-  return base ?? snap.stableMintFeeBps;
-}
-
-export function PriceChip({ snap, pull, source = "Atlas" }: { snap: PoolSnapshot; pull?: { price: number | null; ts: number | null } | null; mirror?: { srcUpdatedAt: number } | null; source?: string }) {
-  const pushFresh = snap.priceFresh && !snap.feedHalted;
-  const dev = pull?.price && snap.price ? (pull.price - snap.price) / snap.price : undefined;
-  const now = Math.floor(Date.now() / 1000);
-  return (
-    <span
-      className="pill"
-      title={`${source} price on-chain (AtlasMirror relays the BSC mainnet Atlas round). Age = time since the feed's updatedAt.${pull?.price ? ` Signed Atlas pull: ${fmtUsd(pull.price, { digits: 2 })}${pull.ts ? `, ${fmtAge(now - pull.ts)} ago` : ""}.` : ""}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${snap.feedHalted ? "bg-bad" : pushFresh ? "bg-good" : "bg-warn"}`} />
-      <span className="num text-ink">{fmtUsd(snap.price, { digits: 2 })}</span>
-      <span>
-        · {source} · {fmtAge(snap.priceUpdatedAt > 0 ? Math.max(0, now - snap.priceUpdatedAt) : snap.priceAge)} ago
-      </span>
-      {dev !== undefined && <span className={`hidden sm:inline ${Math.abs(dev) > 0.01 ? "text-warn" : "text-faint"}`}>· pull {dev >= 0 ? "+" : ""}{(dev * 100).toFixed(2)}%</span>}
-      {!pushFresh && !snap.feedHalted && <span className="text-warn">stale</span>}
-      {snap.feedHalted && <span className="text-bad">HALTED</span>}
     </span>
   );
 }
@@ -143,30 +123,32 @@ function pos(v: number, min: number, max: number) {
   return Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
 }
 
+function Marker({ at }: { at: number }) {
+  return <div className="absolute -top-1 h-4 w-0.5 bg-ink" style={{ left: `calc(${at}% - 1px)` }} />;
+}
+
 export function LeverageGauge({ snap }: { snap: PoolSnapshot }) {
   const min = 1;
   const max = 3.2;
   const lo = pos(snap.lowerTriggerLev, min, max);
   const hi = pos(snap.triggerLev, min, max);
   const tg = pos(snap.targetLev, min, max);
-  const cur = pos(snap.leverage, min, max);
   const inBand = snap.leverage >= snap.lowerTriggerLev && snap.leverage <= snap.triggerLev;
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <span className="label">Leverage (xSTOCK)</span>
-        <span className={`num text-sm font-semibold ${inBand ? "text-lever" : "text-bad"}`}>{fmtLev(snap.leverage)}</span>
+        <span className="label">Pool leverage</span>
+        <span className={`num text-sm font-medium ${inBand ? "text-lever" : "text-bad"}`}>{fmtLev(snap.leverage)}</span>
       </div>
-      <div className="relative mt-2 h-3 overflow-hidden rounded-full bg-surface2">
-        <div className="absolute inset-y-0 left-0 bg-stable/20" style={{ width: `${lo}%` }} />
-        <div className="absolute inset-y-0 bg-lever/15" style={{ left: `${lo}%`, width: `${hi - lo}%` }} />
-        <div className="absolute inset-y-0 right-0 bg-bad/20" style={{ left: `${hi}%` }} />
-        <div className="absolute inset-y-0 w-px bg-ink/40" style={{ left: `${tg}%` }} />
+      <div className="relative mt-2 h-2">
+        <div className="absolute inset-0 overflow-hidden rounded-sm bg-surface2">
+          <div className="absolute inset-y-0 bg-lever/25" style={{ left: `${lo}%`, width: `${hi - lo}%` }} />
+          <div className="absolute inset-y-0 right-0 bg-bad/25" style={{ left: `${hi}%` }} />
+          <div className="absolute inset-y-0 w-px bg-ink/40" style={{ left: `${tg}%` }} />
+        </div>
+        <Marker at={pos(snap.leverage, min, max)} />
       </div>
-      <div className="relative h-3">
-        <div className="absolute -top-[18px] h-[18px] w-0.5 rounded bg-ink" style={{ left: `calc(${cur}% - 1px)` }} />
-      </div>
-      <div className="num flex justify-between text-[10px] text-faint">
+      <div className="num mt-1.5 flex justify-between text-2xs text-faint">
         <span>buy zone &lt; {fmtLev(snap.lowerTriggerLev)}</span>
         <span>target {fmtLev(snap.targetLev)}</span>
         <span>sell zone &gt; {fmtLev(snap.triggerLev)}</span>
@@ -178,25 +160,24 @@ export function LeverageGauge({ snap }: { snap: PoolSnapshot }) {
 export function CrGauge({ snap }: { snap: PoolSnapshot }) {
   const min = 0.8;
   const max = 3;
-  const cur = pos(snap.cr, min, max);
   const one = pos(1, min, max);
   const st = pos(snap.stabilityCR, min, max);
   const tone = snap.cr < 1 ? "text-bad" : snap.cr < snap.stabilityCR ? "text-warn" : "text-stable";
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <span className="label">Collateral ratio (sUSD)</span>
-        <span className={`num text-sm font-semibold ${tone}`}>{Number.isFinite(snap.cr) ? fmtPct(snap.cr, 0) : "∞"}</span>
+        <span className="label">sUSD backing (collateral ratio)</span>
+        <span className={`num text-sm font-medium ${tone}`}>{Number.isFinite(snap.cr) ? fmtPct(snap.cr, 0) : "∞"}</span>
       </div>
-      <div className="relative mt-2 h-3 overflow-hidden rounded-full bg-surface2">
-        <div className="absolute inset-y-0 left-0 bg-bad/25" style={{ width: `${one}%` }} />
-        <div className="absolute inset-y-0 bg-warn/20" style={{ left: `${one}%`, width: `${st - one}%` }} />
-        <div className="absolute inset-y-0 right-0 bg-stable/15" style={{ left: `${st}%` }} />
+      <div className="relative mt-2 h-2">
+        <div className="absolute inset-0 overflow-hidden rounded-sm bg-surface2">
+          <div className="absolute inset-y-0 left-0 bg-bad/25" style={{ width: `${one}%` }} />
+          <div className="absolute inset-y-0 bg-warn/20" style={{ left: `${one}%`, width: `${st - one}%` }} />
+          <div className="absolute inset-y-0 right-0 bg-stable/20" style={{ left: `${st}%` }} />
+        </div>
+        <Marker at={pos(snap.cr, min, max)} />
       </div>
-      <div className="relative h-3">
-        <div className="absolute -top-[18px] h-[18px] w-0.5 rounded bg-ink" style={{ left: `calc(${cur}% - 1px)` }} />
-      </div>
-      <div className="num flex justify-between text-[10px] text-faint">
+      <div className="num mt-1.5 flex justify-between text-2xs text-faint">
         <span>pro rata &lt; 100%</span>
         <span>stability &lt; {fmtPct(snap.stabilityCR, 0)}</span>
         <span>300%</span>
@@ -217,11 +198,11 @@ export function SplitBar({ snap, compact = false }: { snap: PoolSnapshot; compac
             sUSD <span className="num">{fmtUsd(snap.S, { compact: true })}</span> ({s.toFixed(0)}%)
           </span>
           <span className="text-lever">
-            xSTOCK equity <span className="num">{fmtUsd(Math.max(0, snap.E), { compact: true })}</span> ({e.toFixed(0)}%)
+            xSTOCK <span className="num">{fmtUsd(Math.max(0, snap.E), { compact: true })}</span> ({e.toFixed(0)}%)
           </span>
         </div>
       )}
-      <div className={`flex overflow-hidden rounded-full bg-surface2 ${compact ? "h-1.5" : "h-2.5"}`}>
+      <div className={`flex gap-px overflow-hidden rounded-sm bg-surface2 ${compact ? "h-1" : "h-2"}`}>
         <div className="bg-stable" style={{ width: `${s}%` }} />
         <div className="bg-lever" style={{ width: `${e}%` }} />
       </div>
@@ -230,22 +211,23 @@ export function SplitBar({ snap, compact = false }: { snap: PoolSnapshot; compac
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-muted">{children}</div>;
+  return <div className="rounded-card border border-dashed border-line px-4 py-8 text-center text-sm text-muted">{children}</div>;
 }
 
-export function Offline({ what = "The services API", note }: { what?: string; note?: string }) {
+export function Offline({ what = "The keeper API", note }: { what?: string; note?: string }) {
   return (
-    <div className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-ink/80">
-      {what} is not reachable right now. {note ?? "On-chain data on this page still loads; history and rationale come back when the keeper's API is up."}
+    <div className="rounded border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-ink/80">
+      {what} is not reachable right now. {note ?? "On-chain data still loads; history comes back when the keeper's API is up."}
     </div>
   );
 }
 
-export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[] }) {
+/** Segmented control. */
+export function Seg<T extends string>({ value, onChange, items, className = "" }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[]; className?: string }) {
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-lg bg-surface2 p-1">
+    <div className={`seg ${className}`} role="tablist">
       {items.map((i) => (
-        <button key={i.value} className={`tab ${value === i.value ? "tab-active" : ""}`} onClick={() => onChange(i.value)}>
+        <button key={i.value} role="tab" aria-selected={value === i.value} className={`seg-item ${value === i.value ? "seg-active" : ""}`} onClick={() => onChange(i.value)}>
           {i.label}
         </button>
       ))}
@@ -253,12 +235,16 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
   );
 }
 
-export function NavLinkCard({ href, title, body, tone }: { href: string; title: string; body: string; tone?: "stable" | "lever" }) {
+/** Underline tabs. */
+export function UTabs<T extends string>({ value, onChange, items, className = "" }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[]; className?: string }) {
   return (
-    <Link href={href} className="card block transition hover:border-stable/40">
-      <div className={`text-sm font-semibold ${tone === "stable" ? "text-stable" : tone === "lever" ? "text-lever" : "text-ink"}`}>{title} →</div>
-      <div className="mt-1 text-xs text-muted">{body}</div>
-    </Link>
+    <div className={`flex overflow-x-auto ${className}`} role="tablist">
+      {items.map((i) => (
+        <button key={i.value} role="tab" aria-selected={value === i.value} className={`utab ${value === i.value ? "utab-active" : ""}`} onClick={() => onChange(i.value)}>
+          {i.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

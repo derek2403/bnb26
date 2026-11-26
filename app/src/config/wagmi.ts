@@ -22,7 +22,7 @@ const connectors = connectorsForWallets(
         { groupName: "More", wallets: [walletConnectWallet, injectedWallet] },
       ]
     : [{ groupName: "Browser wallet", wallets: [injectedWallet] }],
-  { appName: "SplitStock", projectId: projectId || "splitstock-no-walletconnect" },
+  { appName: "MORE", projectId: projectId || "splitstock-no-walletconnect" },
 );
 
 export const wagmiConfig = createConfig({
