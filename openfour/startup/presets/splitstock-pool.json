@@ -1,0 +1,108 @@
+{
+  "id": "splitstock-pool",
+  "name": "SplitStock Pool Launch",
+  "description": "Fair launch raised in mock tTSLA. Graduation opens a new SplitStock TSLA pool: half the raise seeds protocol-owned first-loss xTSLA (BackstopTreasury), half mints sUSD paired with the meme on PCS v2 (LP to 0xdead). Falls back to meme/tTSLA if the pool path fails. Dollar-quoted graduation liquidity, not a price floor. Demo-only, unaudited, mock assets.",
+  "version": "1.0.0",
+  "notes": [
+    "Addresses marked FROM_DEPLOYMENTS are filled by scripts/register-splitstock.js and scripts/lifecycle-splitstock.js from deployments/<chainId>.json (tokens.tTSLA, core.poolFactory, oracles.TSLA.mirror / scenarioFeed, dex.router, openfour.backstopTreasury).",
+    "Generic scripts/register.js also works with PRESET=splitstock-pool once the placeholders are replaced, but register-splitstock.js is the supported path (author = BackstopTreasury, deployments json written)."
+  ],
+  "validator": {
+    "contract": "SplitPoolPresetValidator",
+    "args": [
+      {
+        "expectedPresetId": 0,
+        "requiredQuoteAsset": "FROM_DEPLOYMENTS:tokens.tTSLA",
+        "minSaleAmount": 0,
+        "maxSaleAmount": 0,
+        "maxRaiseAmount": "10000000000000000000",
+        "minDuration": 60,
+        "poolFactory": "FROM_DEPLOYMENTS:core.poolFactory",
+        "liveFeed": "FROM_DEPLOYMENTS:oracles.TSLA.mirror",
+        "scenarioFeed": "FROM_DEPLOYMENTS:oracles.TSLA.scenarioFeed",
+        "poolRouter": "FROM_DEPLOYMENTS:dex.router",
+        "backstopTreasury": "FROM_DEPLOYMENTS:openfour.backstopTreasury",
+        "stockSymbol": "TSLA"
+      }
+    ]
+  },
+  "tokenImpl": {
+    "reuse": "fork"
+  },
+  "modules": {
+    "token": {
+      "contract": "StandardTokenModule",
+      "keySource": "module.token.standard",
+      "reuse": true
+    },
+    "vault": {
+      "contract": "StandardVault",
+      "keySource": "module.vault.standard",
+      "reuse": true
+    },
+    "curve": {
+      "contract": "FairLaunchCurveModule",
+      "keySource": "module.curve.fair_launch",
+      "reuse": true
+    },
+    "trade": {
+      "contract": "FairLaunchTradeModule",
+      "keySource": "module.trade.fair_launch",
+      "reuse": true
+    },
+    "migrate": {
+      "contract": "SplitPoolMigrateModule",
+      "keySource": "module.migrate.splitstock_pool"
+    },
+    "customData": {
+      "contract": "SplitPoolCustomDataModule",
+      "keySource": "module.data.splitstock_pool"
+    }
+  },
+  "create": {
+    "name": "Gigawatt Goblin",
+    "symbol": "GGOB",
+    "tokenUri": "",
+    "maxSupply": "1000000",
+    "saleAmount": "800000",
+    "raiseAmount": "4",
+    "curve": {
+      "fixedPrice": "0.000005",
+      "sellPenaltyBps": "500",
+      "enableSell": true,
+      "minPurchase": "1000000000000000000",
+      "maxPurchase": "800000000000000000000000"
+    },
+    "trade": {
+      "maxBuyAmount": "800000000000000000000000",
+      "maxPerAddress": "0",
+      "maxSellAmount": "400000000000000000000000",
+      "buyFeeBps": "50",
+      "sellFeeBps": "50",
+      "feeRecipient": "FROM_DEPLOYMENTS:openfour.backstopTreasury"
+    },
+    "migrate": {
+      "softCap": "0",
+      "duration": "1800",
+      "tokenLiquidityAmount": "0",
+      "maxQuoteToUse": "0",
+      "stockAsset": "FROM_DEPLOYMENTS:tokens.tTSLA",
+      "poolFactory": "FROM_DEPLOYMENTS:core.poolFactory",
+      "feed": "FROM_DEPLOYMENTS:oracles.TSLA.mirror",
+      "poolRouter": "FROM_DEPLOYMENTS:dex.router",
+      "backstopTreasury": "FROM_DEPLOYMENTS:openfour.backstopTreasury",
+      "stockSymbol": "TSLA",
+      "seedBps": "5000",
+      "minSusdOutBps": "9000",
+      "graceWindow": "1800",
+      "minMigrateGas": "8000000"
+    }
+  },
+  "loop": {
+    "buyAmount": "100000",
+    "sellAmount": "40000",
+    "sell": true,
+    "sellOut": true,
+    "gasLimit": "15000000"
+  }
+}
