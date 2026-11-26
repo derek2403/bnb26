@@ -1,0 +1,174 @@
+{
+  "chainId": 97,
+  "updatedAt": "2026-11-26T15:39:16Z",
+  "deployer": "0x31777694F7b90b635B1F3B786f5D24be7651BE7B",
+  "tokens": {
+    "tNVDA": "0x5Df0DC395E7686bcDc41f75891f1Ab982476fddd",
+    "tTSLA": "0x9A75c8fFf0ce5Ed6B9F0fc28ad57D0DAC34B05F6",
+    "mUSDC": "0x49c67aEf9Ad0bDAF3e96103059E0f931e5a9677D",
+    "WBNB": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
+  },
+  "core": {
+    "poolFactory": "0xF4Ef260a4605A2bfE7B0fF3113065D3FCD6EDBb9",
+    "poolLogic": "0xB06B203d2080984e30C7B1844a6EEd9d5C576212",
+    "riskOracle": "0x0411D501839553cc53cbbcE45eD87501DF531190",
+    "marketCalendar": "0x74B302D696D13344fC4b46743d214c6Eca2fC3c2",
+    "logAnchor": "0x96b3F4BE973A314E73c9ACA81c206c7Fec5d3ca0",
+    "sandboxFactory": "0xb2A169217733a77B895694642bC9576f73FEf2ab",
+    "creatorRegistrar": "0xdE919bD132f6458790f149fAc5F424F1A748919F",
+    "timelock": "0x30c0d846372dcdd13296031748d4d8dB863619C0",
+    "guardian": "0x31777694F7b90b635B1F3B786f5D24be7651BE7B",
+    "poolImpl": "0xE95aE2995aA3a7B9Bda0E36B78C1e62F13849138",
+    "tokenImpl": "0xdd37B8B530F489Da7A0A3De9D33D7EDEBBE3AC28",
+    "stabilityPoolImpl": "0xF4EA2f2DFfD5b18A33dB8F1aC851983D1dFba073",
+    "scenarioFeedImpl": "0x964F456566F97daCCC16bB58a2b4258414AB8D5b",
+    "poolImplLegacy": "0xcf70F6864DBB05D829E62A637018F7ec84C747d4",
+    "poolLogicLegacy": "0x44BCE3FCAE26CabeE16D639240D1dA89376DcA18",
+    "stabilityPoolImplLegacy": "0x5eCC5Cb2dDa45c89FCFE318cD56b259E7C123aC3"
+  },
+  "oracles": {
+    "NVDA": {
+      "mirror": "0x5a055A63188315401F8fc22fA451E309a7C6F828",
+      "scenarioFeed": "0xb92f8082876f0d0372479c451C6E1D0068Be2cC1",
+      "pullAdapter": "0x599e6f8EB27c71f664AF6c271bF5e7a2fd3FDce3",
+      "atlasSource": {
+        "chainId": 56,
+        "feed": "0xf25Af12920D408bAf6211e9e90eDa89DF3D8CCDa"
+      }
+    },
+    "TSLA": {
+      "mirror": "0xD836c54Cb9cB6379A9c40C0B163B8d7f39B30214",
+      "scenarioFeed": "0xdBd919A2b27289504b1cB8A853319fa2b0E21aDb",
+      "pullAdapter": "0xa5029d627F21ae84D6208fbbBb03ea04FA4213FD",
+      "atlasSource": {
+        "chainId": 56,
+        "feed": "0xEAcE519ebB14fB8404fA6DdD23C3b34abaDE44aa",
+        "feedId": "0x000003a5"
+      }
+    },
+    "atlasBnbUsd": "0x3957d289ee9C38272377786787ea34F9dd29788D"
+  },
+  "pools": [
+    {
+      "id": "nvda-dev",
+      "symbol": "NVDA",
+      "assetId": "0xe108948b9667048232851f26a1427d3a908b22da622562906ca50ea536c2ecfb",
+      "kind": "dev",
+      "pool": "0xA78c6626e452c378FBef98c309774dDc382Ea176",
+      "sUSD": "0xf07ae54590CF46fA6aCF320a29B0CaAC82c4a621",
+      "xToken": "0x7A45345C932c1C557e0EbCa96019C833877a8C8E",
+      "stabilityPool": "0xE34f3bd0fE64f8A18220ec815063683B5ae9F371",
+      "feed": "0x5a055A63188315401F8fc22fA451E309a7C6F828",
+      "openedBy": "0x31777694F7b90b635B1F3B786f5D24be7651BE7B",
+      "openTx": ""
+    },
+    {
+      "id": "nvda-scenario",
+      "symbol": "NVDA",
+      "assetId": "0xe108948b9667048232851f26a1427d3a908b22da622562906ca50ea536c2ecfb",
+      "kind": "scenario",
+      "pool": "0xDedAb55A89DB4D6A2b901ed89E34fd589231c833",
+      "sUSD": "0xEfb04C8C85945c293eaD242Fe884fa6A08E92389",
+      "xToken": "0x4e1150F6C8eE03f4303171b61868a0Ff3B4953EE",
+      "stabilityPool": "0xA4A0Bc80e5e2Dac63020Bc9225bC8BC839b058a4",
+      "feed": "0xb92f8082876f0d0372479c451C6E1D0068Be2cC1",
+      "openedBy": "0x31777694F7b90b635B1F3B786f5D24be7651BE7B",
+      "openTx": ""
+    },
+    {
+      "id": "tsla-scenario",
+      "symbol": "TSLA",
+      "assetId": "0x0a8f1f385fed9c77a2e0daa363ccc865e971bdbe4458bb570cc0acb068d7c0f2",
+      "kind": "scenario",
+      "pool": "0x21d252fA1b95A2F27AE6F1647905CE0bf792705E",
+      "sUSD": "0xf3Dbd1134AF52632ec0764c8316E46db47Fe74bE",
+      "xToken": "0x7F9EB86815863FC7D311E4aFDA76798c61bf24e5",
+      "stabilityPool": "0x03ad4Af1451e8e634486D28D4b495713De65208e",
+      "feed": "0xdBd919A2b27289504b1cB8A853319fa2b0E21aDb",
+      "openedBy": "0x31777694F7b90b635B1F3B786f5D24be7651BE7B",
+      "openTx": ""
+    },
+    {
+      "id": "nvda-flap",
+      "symbol": "NVDA",
+      "assetId": "0xe108948b9667048232851f26a1427d3a908b22da622562906ca50ea536c2ecfb",
+      "kind": "flap",
+      "pool": "0x0CD861cd0dD919434019f18F71630D2F678CD208",
+      "sUSD": "0xe1F327e5D9B6DC7542a111C4c978673b07918011",
+      "xToken": "0xd173a06ACE41870f84b0800FaDAc4677F42A3cc2",
+      "stabilityPool": "0x36Fe40CE6925fd1711ae3aC9e89c3348E1354d07",
+      "feed": "0x5a055A63188315401F8fc22fA451E309a7C6F828",
+      "openedBy": "0x56ceF14ae0171Fb3DFa04DD44EA0811E3D8517c4",
+      "openTx": "0x374278ddaf40b3ed51f56f032bce80cbafe649c646229a39e2d523a3743144dc"
+    }
+  ],
+  "dex": {
+    "router": "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+    "factory": "0x6725F303b657a9451d8BA641348b6761A6CC7a17",
+    "mockRouter": "0x53f1E6a4507285c0267D0B1C3539F4515c2FECE8",
+    "pairs": {
+      "tNVDA_mUSDC": "0xb0B258A5811ba61Df778d59bD7A1F314dB2206a9",
+      "tTSLA_mUSDC": "0x20c8A90668E7AEdac3Ca7e7BE88d41ef7387Cf52",
+      "WBNB_mUSDC": "0x315C083D8718799a731F61F28221844bDc724567",
+      "WBNB_tNVDA": "0xFE5CD6AEdC093e89c871A5297b825956b7f3f906"
+    }
+  },
+  "flap": {
+    "portal": "0x000042108465206185A077Edc3F3fd2b49060000",
+    "guardian": "0x00004d58290854c5E9880F4b5B1993c6Ad8b0000",
+    "v2Router": "0xc9D63ddCB9549578057EAB6A83a543DdFEE2b8c3",
+    "config": "0x9AeA8a4e1fcf44dDC32dd442D5d015bcd4083ddb",
+    "configAdmin": "0x0000000000000000000000000000000000000000",
+    "launcherFactory": "0x01013DCE27c3F00cac8Bf254E20d02fD3500FfD2",
+    "vaultFactory": "0xA441ECBfd7a28c3b949C0672cbD637355e97F2C4",
+    "launchers": [
+      {
+        "launcher": "0x56ceF14ae0171Fb3DFa04DD44EA0811E3D8517c4",
+        "token": "0xFc500e99b8bEFC3c637503469153DFE928977777",
+        "vault": "0x02e1945d2b5705d47747b6735bb25BEcc0C60D24",
+        "poolId": "nvda-flap",
+        "launchTx": "0x0b5e88b6d213529805a51900f5493e4c7ffb27e236e7ad5cd0428002b7b46850"
+      }
+    ]
+  },
+  "openfour": {
+    "registry": "0xC7603FD7E6bE13c727063a515651981c69a0befa",
+    "core": "0xB969FcaE60ff652Dd59A014a89B16053D619e4ba",
+    "tools": "0x0d0FEB46fdE7540ef95175bc975893B58124B91A",
+    "feeRouter": "0x7EEd3cb2cf85D187BBD04996004932C570FB1f8A",
+    "presetId": "1795700948232",
+    "migrateModule": "0x43DAa1613165Cc774ABbe7A956BE9ae97056693a",
+    "customDataModule": "0xB61b75A7F1F2384E2C05b745DCd84DD98FfD3B10",
+    "validator": "0x3B35e600AEcc3A4386B1d7596A6a6eD85d23A42f",
+    "backstopTreasury": "0xFBCddbaF29dEee2549C97a2bfB6d15A64ac4fb65",
+    "tokens": [
+      {
+        "token": "0x3E27ac92AA02C94b78a6b88fD14429C8CfB7bf31",
+        "poolId": null,
+        "name": "GPU Goblin",
+        "symbol": "GOBLIN",
+        "presetId": "1795700948232",
+        "vault": "0x34C6B2558F82E21629d3e305eb6c022fb7dE06d4",
+        "migrateModule": "0xF59d76dac50eE351663cEa60604Fb9459aE91597",
+        "customData": "0x9A4C99dCe87c17E92Ccc486124aA84e1Aa13F528",
+        "branch": null,
+        "pair": null,
+        "phase": "Trading",
+        "createTx": "0x4b55ac3ccfce5034903f375d31e647fb7a42753121e1a12f10528c46f31d463e",
+        "migrateTx": null
+      }
+    ],
+    "baselinePresetId": "1795700944983",
+    "migrateModuleKey": "0xfd2252402da7916a3876b2cbc1b0d250e47261d52d3564699405e64142b02189",
+    "customDataModuleKey": "0xff8479cfa9bb9dac1e2fcfff111d3cb3eb9210f2f0e82f0d5470e0f0cba68a1c",
+    "migrateTag": "module.migrate.splitstock_pool",
+    "customDataTag": "module.data.splitstock_pool",
+    "presetTx": "0xba268be7cb237c0c39ea2da13f4703a2bf9f8bd373a5c5fe07cf9fc381bb98e8",
+    "stock": "0x9A75c8fFf0ce5Ed6B9F0fc28ad57D0DAC34B05F6"
+  },
+  "erc8004": {
+    "identity": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "reputation": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+    "agentId": null
+  }
+}
