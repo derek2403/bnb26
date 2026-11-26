@@ -1,0 +1,45 @@
+# Backup keeper: if the VM is down, this keeps the Atlas mirror fresh (so mints keep working), rebalances pools and
+# accrues funding. It uses the BACKUP pusher key (a second PUSHER on every AtlasMirror) and runs without Postgres.
+# Required repository secrets: MIRROR_BACKUP_PRIVATE_KEY, OPS_BACKUP_PRIVATE_KEY, BSC_TESTNET_RPC, BSC_MAINNET_RPC
+# (optional BSC_MAINNET_LOGS_RPC for the Atlas source-tx lookup). No CMC, LLM or other keys are needed here.
+name: keeper-backup
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: keeper-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  keeper-once:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: guard against keyless CMC calls
+        run: node scripts/check-public-api.mjs
+      - name: keeper once (mirror, rebalance, accrue)
+        env:
+          DB_DISABLED: "1"
+          DEPLOYMENTS_DIR: ${{ github.workspace }}/deployments
+          MIRROR_PRIVATE_KEY: ${{ secrets.MIRROR_BACKUP_PRIVATE_KEY }}
+          OPS_PRIVATE_KEY: ${{ secrets.OPS_BACKUP_PRIVATE_KEY }}
+          BSC_TESTNET_RPC: ${{ secrets.BSC_TESTNET_RPC }}
+          BSC_MAINNET_RPC: ${{ secrets.BSC_MAINNET_RPC }}
+          BSC_MAINNET_LOGS_RPC: ${{ secrets.BSC_MAINNET_LOGS_RPC }}
+        run: npx tsx src/cli.ts keeper once --jobs mirror,rebalance,accrue --no-db
