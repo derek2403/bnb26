@@ -9,6 +9,7 @@ import { OF, PHASES, PHASE_MIGRATED, useOfTokens } from "@/hooks/useOpenFour";
 import { usePoolList } from "@/hooks/usePools";
 import { fmtLev, fmtNum, fmtUsd, short } from "@/lib/format";
 import { Empty, SourceBadge } from "../ui";
+import { LaunchMarketForm } from "./LaunchMarketForm";
 import { MemeDetail } from "./MemeDetail";
 
 type TokenInfo = { name: string; symbol: string; vault: Address; raiseAmount: bigint; exists: boolean; quoteAsset: Address };
@@ -77,6 +78,8 @@ export function LaunchpadView() {
       <h1 className="text-lg font-semibold tracking-tight text-ink">Launch a market</h1>
       <p className="mt-0.5 max-w-3xl text-[13px] text-muted">New stock markets on MORE are opened by community launches on Flap or Four.meme. The raise becomes the new market&apos;s first-loss xSTOCK, and the launch&apos;s fees keep funding that market&apos;s insurance vault.</p>
 
+      <LaunchMarketForm />
+
       <section className="mt-4 grid gap-px overflow-hidden rounded-card border border-line bg-line md:grid-cols-2">
         <div className="bg-surface p-4">
           <div className="flex items-center justify-between gap-2">
@@ -112,7 +115,7 @@ export function LaunchpadView() {
         </div>
       </section>
 
-      <div className="mt-6 flex items-baseline justify-between">
+      <div id="four-launches" className="mt-6 flex scroll-mt-20 items-baseline justify-between">
         <h2 className="text-[13px] font-semibold text-ink">Market launches on Four.meme</h2>
         <span className="text-xs text-faint">Raised in tTSLA · BSC testnet</span>
       </div>
