@@ -24,4 +24,7 @@ export function useOfTokens() {
   });
 }
 
-export const PHASES = ["Trading", "Migrating", "Migrated", "Phase 3"];
+// Same order as OpenFourTypes.Phase { Created, Trading, MigratePending, Migrated, Terminal, SoldOut }.
+export const PHASES = ["Created", "Trading", "Graduating", "Graduated", "Closed", "Sold out"];
+/** OpenFourTypes.Phase.Migrated: the meme graduated and its migrate module opened the pool. */
+export const PHASE_MIGRATED = 3;

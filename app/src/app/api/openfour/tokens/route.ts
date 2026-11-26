@@ -14,10 +14,13 @@ type Row = { token: Address; poolId?: string; name?: string; symbol?: string; cr
 // each with Core.tokens(token).exists; nothing scans logs.
 export async function GET() {
   const rows = new Map<string, Row>();
-  for (const t of deployments97.openfour.tokens) rows.set(t.token.toLowerCase(), { token: t.token, poolId: t.poolId, source: "deployments" });
+  // Rehearsal launches (deployments openfour.tokens[].hidden) stay out of the list whatever the source.
+  const hidden = new Set(deployments97.openfour.tokens.filter((t) => t.hidden).map((t) => t.token.toLowerCase()));
+  const skip = (a: string) => hidden.has(a.toLowerCase()) || rows.has(a.toLowerCase());
+  for (const t of deployments97.openfour.tokens) if (!skip(t.token)) rows.set(t.token.toLowerCase(), { token: t.token, poolId: t.poolId, source: "deployments" });
   const remote = await servicesJson<{ tokens?: TokenRecord[] }>("openfour/tokens", { revalidate: 30 });
-  for (const t of remote?.tokens ?? []) if (!rows.has(t.token.toLowerCase())) rows.set(t.token.toLowerCase(), { ...t, source: "services" });
-  for (const t of ofStore.tokens.values()) if (!rows.has(t.token.toLowerCase())) rows.set(t.token.toLowerCase(), { ...t, source: "signed" });
+  for (const t of remote?.tokens ?? []) if (!skip(t.token)) rows.set(t.token.toLowerCase(), { ...t, source: "services" });
+  for (const t of ofStore.tokens.values()) if (!skip(t.token)) rows.set(t.token.toLowerCase(), { ...t, source: "signed" });
   return Response.json({ tokens: [...rows.values()] }, { headers: { "cache-control": "no-store" } });
 }
 

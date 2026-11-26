@@ -3,7 +3,7 @@ import Link from "next/link";
 import { bscTestnet } from "viem/chains";
 import { useReadContracts } from "wagmi";
 import { OpenFourCoreAbi, OpenFourVaultAbi } from "@/abi";
-import { OF, PHASES, useOfTokens } from "@/hooks/useOpenFour";
+import { OF, PHASES, PHASE_MIGRATED, useOfTokens } from "@/hooks/useOpenFour";
 import { fmtNum, short } from "@/lib/format";
 
 type TokenInfo = { name: string; symbol: string; vault: `0x${string}`; raiseAmount: bigint; exists: boolean; migrateModule: `0x${string}`; quoteAsset: `0x${string}` };
@@ -64,7 +64,7 @@ export default function MemesPage() {
             <Link key={t.token} href={`/memes/${t.token}`} className="of-panel of-panel-brand" style={{ display: "block" }}>
               <div style={{ display: "flex", justifyContent: "space-between", color: "var(--of-text)", fontWeight: 700 }}>
                 <span>{d?.name ?? t.name ?? short(t.token)} <span style={{ color: "var(--of-muted)", fontWeight: 500 }}>${d?.symbol ?? t.symbol ?? ""}</span></span>
-                <span style={{ fontSize: 12, color: phase === 2 ? "var(--of-brand)" : "var(--of-muted)" }}>{d?.exists === false ? "not on Core" : phase !== undefined ? PHASES[phase] ?? `phase ${phase}` : "…"}</span>
+                <span style={{ fontSize: 12, color: phase === PHASE_MIGRATED ? "var(--of-brand)" : "var(--of-muted)" }}>{d?.exists === false ? "not on Core" : phase !== undefined ? PHASES[phase] ?? `phase ${phase}` : "…"}</span>
               </div>
               <div style={{ marginTop: 10, height: 6, borderRadius: 4, background: "var(--of-border)" }}>
                 <div style={{ width: `${pct}%`, height: 6, borderRadius: 4, background: "var(--of-brand-gradient)" }} />
@@ -72,7 +72,7 @@ export default function MemesPage() {
               <div style={{ marginTop: 6, fontSize: 12 }}>
                 {raised !== undefined ? `${fmtNum(Number(raised) / 1e18)} / ${fmtNum(Number(d?.raiseAmount ?? 0n) / 1e18)} tTSLA raised (${pct.toFixed(0)}%)` : "reading vault…"}
               </div>
-              {phase === 2 && (
+              {phase === PHASE_MIGRATED && (
                 <div style={{ marginTop: 8, fontSize: 13, color: "var(--of-brand)", fontWeight: 600 }}>Graduated · TSLA pool opened</div>
               )}
             </Link>

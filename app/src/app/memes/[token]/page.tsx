@@ -8,7 +8,7 @@ import { useAccount, usePublicClient, useReadContracts } from "wagmi";
 import { CreatorRegistrarAbi, OpenFourCoreAbi, OpenFourCoreExtraAbi, OpenFourToolsAbi, OpenFourVaultAbi, SplitPoolMigrateModuleAbi, erc20Abi } from "@/abi";
 import { addressUrl } from "@/config/chains";
 import { deployments97 } from "@/config/deployments";
-import { OF, PHASES } from "@/hooks/useOpenFour";
+import { OF, PHASES, PHASE_MIGRATED } from "@/hooks/useOpenFour";
 import { useNow } from "@/hooks/usePools";
 import { describeError, useTx } from "@/hooks/useTx";
 import { fmtDuration, fmtNum, MAX_UINT, parseAmount, short } from "@/lib/format";
@@ -109,7 +109,7 @@ export default function MemeTokenPage() {
   if (!OF.core) return <div className="of-panel">The OpenFour fork is not deployed yet.</div>;
 
   const pct = totalRaised !== undefined && raiseAmount ? Math.min(100, Number((totalRaised * 10000n) / (raiseAmount || 1n)) / 100) : 0;
-  const migrated = pv?.migrated || phase === 2;
+  const migrated = pv?.migrated || phase === PHASE_MIGRATED;
   const tradeNeedsApprove = side === "buy" ? (est?.e ? quoteAllow < est.e.userPays : false) : amount !== undefined && tokenAllow < amount;
   const graduatedPool = grad && grad.pool && grad.pool !== "0x0000000000000000000000000000000000000000" ? grad.pool : undefined;
   const registrar = deployments97.core.creatorRegistrar;
