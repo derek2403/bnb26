@@ -1,6 +1,7 @@
 import { createWalletClient, erc20Abi, fallback, getAddress, http, isAddress, parseAbi, zeroAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { bscTestnet } from "viem/chains";
+import { LeveragePoolAbi } from "@/abi";
 import { addr, deployments97 } from "@/config/deployments";
 import { testnetClient } from "@/lib/server/chain";
 import { clientIp, rateLimit, tooMany } from "@/lib/server/rateLimit";
@@ -109,7 +110,20 @@ export async function POST(req: Request) {
         await write({ address: launcher, abi: launcherAbi, functionName: "openPool" });
         steps.push("opened the market");
       }
-      return { pool: await read<Address>("pool") };
+      // A new market holds only its first-loss seed (leverage 1x). Mint sUSD against it so it opens at about 2x.
+      const pool = await read<Address>("pool");
+      const st = (await pc.readContract({ address: pool, abi: LeveragePoolAbi, functionName: "state" })) as { leverage: bigint };
+      if (st.leverage < 18n * 10n ** 17n) {
+        const max = (await pc.readContract({ address: pool, abi: LeveragePoolAbi, functionName: "maxMintStable" })) as bigint;
+        const amt = (max * 97n) / 100n;
+        const have = (await pc.readContract({ address: TNVDA, abi: erc20Abi, functionName: "balanceOf", args: [account.address] })) as bigint;
+        if (amt > 10n ** 15n && have >= amt) {
+          await write({ address: TNVDA, abi: erc20Abi, functionName: "approve", args: [pool, amt] });
+          await write({ address: pool, abi: LeveragePoolAbi, functionName: "mintStable", args: [amt, 0n, BigInt(Math.floor(Date.now() / 1000) + 1200)] });
+          steps.push("minted sUSD so the market starts at about 2x leverage");
+        }
+      }
+      return { pool };
     });
     return Response.json({ ok: true, txs, steps, ...out }, { headers: { "cache-control": "no-store" } });
   } catch (e) {

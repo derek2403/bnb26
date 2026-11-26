@@ -118,13 +118,16 @@ export function LaunchMarketForm() {
               })}
             </div>
             {stock === "TSLA" ? (
-              <p className="mt-2 text-xs text-muted">
-                TSLA launches through Four.meme on testnet.{" "}
-                <a href="#four-launches" className="link">
-                  See the TSLA Market launch below
-                </a>
-                .
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
+                <span>
+                  TSLA launches through Four.meme (OpenFour) on testnet: the{" "}
+                  <a href="#four-launches" className="link">
+                    TSLA Market launch
+                  </a>{" "}
+                  is pre-funding below. Its last buy sells it out and opens the TSLA market.
+                </span>
+                <FundFour />
+              </div>
             ) : stock !== LIVE ? (
               <p className="mt-2 text-xs text-muted">{STOCK_NAMES[stock] ?? stock}: needs a tokenized stock and price feed on testnet before it can be launched.</p>
             ) : (
@@ -334,5 +337,32 @@ function LaunchCard({ l }: { l: MyLaunch }) {
         </a>
       </div>
     </div>
+  );
+}
+
+/** Demo funding for the TSLA Market launch on Four.meme: a server-side testnet key buys the rest, which graduates it. */
+function FundFour() {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/launch/fund-four", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[] };
+      setMsg(j.ok ? { ok: true, text: j.steps?.length ? `Done: ${j.steps.join("; ")}.` : "Done." } : { ok: false, text: j.error ?? "Funding failed." });
+    } catch {
+      setMsg({ ok: false, text: "Funding failed. Try again." });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <button className="btn-primary btn-sm" disabled={busy} onClick={run}>
+        {busy ? "Funding and graduating…" : "Fund and open the TSLA market"}
+      </button>
+      {msg && <span className={msg.ok ? "text-good" : "text-bad"}>{msg.text}</span>}
+    </span>
   );
 }
