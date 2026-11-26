@@ -12,6 +12,27 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   eslint: { ignoreDuringBuilds: true },
+  // Four pages: Markets (/), Trade (/trade/[id]), Launchpad, Transparency. Older routes redirect (temporary, so
+  // nothing is cached in browsers while the app changes).
+  async redirects() {
+    const to = (source, destination) => ({ source, destination, permanent: false });
+    return [
+      to("/trade", "/trade/nvda-flap"),
+      to("/pools", "/"),
+      to("/pools/:id", "/trade/:id"),
+      to("/scenario", "/trade/nvda-flap"),
+      to("/risk", "/trade/nvda-flap"),
+      to("/agent", "/trade/nvda-flap"),
+      to("/memes", "/launchpad"),
+      to("/memes/new", "/launchpad"),
+      to("/memes/:token", "/launchpad?token=:token"),
+      to("/launch", "/"),
+      to("/proof", "/transparency"),
+      to("/status", "/transparency"),
+      to("/backtest", "/transparency"),
+      to("/backstop", "/transparency"),
+    ];
+  },
   webpack: (config) => {
     // Optional peer deps pulled in by WalletConnect / MetaMask SDK that are never used in the browser bundle.
     config.externals.push("pino-pretty", "lokijs", "encoding");

@@ -2,46 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Trading-terminal palette. Neutral cool greys, one accent (cyan), green/red only for price direction,
+   blue = sUSD, amber = xSTOCK. Dark is the default (see THEME_SCRIPT); light is a full theme. */
 :root {
-  --bg: 247 249 252;
+  --bg: 244 246 249;
   --surface: 255 255 255;
-  --surface-2: 241 245 249;
-  --line: 224 230 238;
-  --ink: 15 23 42;
-  --muted: 71 85 105;
-  --faint: 148 163 184;
+  --surface-2: 240 243 247;
+  --line: 225 230 237;
+  --ink: 17 22 31;
+  --muted: 82 94 112;
+  --faint: 138 149 166;
+  --accent: 8 128 158;
   --stable: 37 99 235;
-  --stable-soft: 219 234 254;
-  --lever: 217 119 6;
-  --lever-soft: 254 243 199;
-  --good: 22 163 74;
-  --warn: 202 138 4;
-  --bad: 220 38 38;
-  /* chart categorical order (validated: dataviz validate_palette, light surface) */
-  --chart-1: #d97706;
-  --chart-2: #7c3aed;
-  --chart-3: #0891b2;
+  --stable-soft: 226 236 254;
+  --lever: 190 112 4;
+  --lever-soft: 253 243 220;
+  --good: 11 150 101;
+  --warn: 176 122 0;
+  --bad: 217 48 68;
   color-scheme: light;
 }
 
 .dark {
-  --bg: 8 11 17;
-  --surface: 16 21 30;
-  --surface-2: 23 29 41;
-  --line: 36 44 59;
-  --ink: 229 235 244;
-  --muted: 150 163 184;
-  --faint: 98 112 134;
-  --stable: 96 165 250;
-  --stable-soft: 21 36 77;
-  --lever: 251 191 36;
-  --lever-soft: 61 42 9;
-  --good: 74 222 128;
-  --warn: 250 204 21;
-  --bad: 248 113 113;
-  --chart-1: #c97a06;
-  --chart-2: #9061f9;
-  --chart-3: #0f9fbf;
+  --bg: 10 13 18;
+  --surface: 16 20 27;
+  --surface-2: 23 28 37;
+  --line: 33 39 50;
+  --ink: 228 233 240;
+  --muted: 142 152 168;
+  --faint: 92 102 119;
+  --accent: 77 205 222;
+  --stable: 100 142 255;
+  --stable-soft: 22 32 62;
+  --lever: 240 172 64;
+  --lever-soft: 52 38 14;
+  --good: 46 189 133;
+  --warn: 232 184 62;
+  --bad: 246 70 93;
   color-scheme: dark;
 }
 
@@ -52,28 +49,39 @@ body {
 }
 
 body {
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: "tnum" 1, "cv02" 1;
   -webkit-font-smoothing: antialiased;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line)) transparent;
+}
+
 @layer components {
+  .panel {
+    @apply border border-line bg-surface;
+  }
   .card {
-    @apply rounded-card border border-line bg-surface p-4 sm:p-5;
+    @apply rounded-card border border-line bg-surface p-4;
   }
   .card-title {
     @apply text-sm font-semibold text-ink;
   }
   .label {
-    @apply text-[11px] font-medium uppercase tracking-wide text-faint;
+    @apply text-[11px] font-medium uppercase tracking-wider text-faint;
   }
   .num {
     @apply font-mono tabular-nums;
   }
   .btn {
-    @apply inline-flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-[34px] items-center justify-center gap-2 rounded border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn border-transparent bg-ink text-surface hover:bg-ink/90;
+    @apply btn border-transparent bg-ink text-bg hover:bg-ink/90;
+  }
+  .btn-accent {
+    @apply btn border-transparent bg-accent text-white hover:bg-accent/90 dark:text-black;
   }
   .btn-stable {
     @apply btn border-transparent bg-stable text-white hover:bg-stable/90;
@@ -82,27 +90,38 @@ body {
     @apply btn border-transparent bg-lever text-white hover:bg-lever/90 dark:text-black;
   }
   .btn-sm {
-    @apply min-h-[30px] px-2.5 py-1 text-xs;
+    @apply min-h-[26px] px-2 py-0.5 text-xs;
   }
   .input {
-    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none placeholder:text-faint focus:border-stable focus:ring-2 focus:ring-stable/20;
+    @apply w-full rounded border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none placeholder:text-faint focus:border-accent;
   }
   .pill {
-    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface2 px-2 py-0.5 text-[11px] font-medium text-muted;
-  }
-  .tab {
-    @apply rounded-md px-3 py-1.5 text-sm font-medium text-muted hover:text-ink;
-  }
-  .tab-active {
-    @apply bg-surface text-ink shadow-sm;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-line px-1.5 py-px text-[11px] font-medium text-muted;
   }
   .link {
-    @apply text-stable hover:underline;
+    @apply text-accent hover:underline;
   }
-  .table-head {
-    @apply px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-faint;
+  .th {
+    @apply whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-faint;
   }
-  .table-cell {
-    @apply px-3 py-3 text-sm;
+  .td {
+    @apply whitespace-nowrap px-3 py-2 text-sm;
+  }
+  /* underline tabs (bottom panel, order panel) */
+  .utab {
+    @apply relative whitespace-nowrap px-3 py-2.5 text-[13px] font-medium text-muted transition-colors hover:text-ink;
+  }
+  .utab-active {
+    @apply text-ink after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-accent after:content-[''];
+  }
+  /* segmented control */
+  .seg {
+    @apply inline-flex rounded border border-line bg-surface2 p-0.5;
+  }
+  .seg-item {
+    @apply rounded-sm px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-ink;
+  }
+  .seg-active {
+    @apply bg-surface text-ink shadow-sm;
   }
 }
