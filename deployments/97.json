@@ -1,6 +1,6 @@
 {
   "chainId": 97,
-  "updatedAt": "2026-11-26T15:39:16Z",
+  "updatedAt": "2026-11-26T16:09:47.890Z",
   "deployer": "0x31777694F7b90b635B1F3B786f5D24be7651BE7B",
   "tokens": {
     "tNVDA": "0x5Df0DC395E7686bcDc41f75891f1Ab982476fddd",
@@ -100,6 +100,20 @@
       "feed": "0x5a055A63188315401F8fc22fA451E309a7C6F828",
       "openedBy": "0x56ceF14ae0171Fb3DFa04DD44EA0811E3D8517c4",
       "openTx": "0x374278ddaf40b3ed51f56f032bce80cbafe649c646229a39e2d523a3743144dc"
+    },
+    {
+      "id": "tsla-four-rehearsal",
+      "symbol": "TSLA",
+      "assetId": "0x0a8f1f385fed9c77a2e0daa363ccc865e971bdbe4458bb570cc0acb068d7c0f2",
+      "kind": "four",
+      "pool": "0xD1B235aa14DD6B9Cb06Edef3322a05a0dEd59a36",
+      "sUSD": "0xC5f1679708dAa3bAeDFD9a41cd320f138C5C5985",
+      "xToken": "0x4492a7f9240450337D47DDd91d23C762A4860e11",
+      "stabilityPool": "0x5eBDF6656b08551E6d0e1e679A84aDa7e0C177a7",
+      "feed": "0xD836c54Cb9cB6379A9c40C0B163B8d7f39B30214",
+      "openedBy": "0xf54aa4dD8D40d1D0822B15aAcA8864d7643c90d4",
+      "openTx": "0x8359891ff4e49357a7607f5df2fb49562ce04716ca14c2cc6c8b03220cbe99fb",
+      "hidden": true
     }
   ],
   "dex": {
@@ -156,6 +170,22 @@
         "phase": "Trading",
         "createTx": "0x4b55ac3ccfce5034903f375d31e647fb7a42753121e1a12f10528c46f31d463e",
         "migrateTx": null
+      },
+      {
+        "token": "0x9f1b6E43BA3c817523504628f6DfFB71cA135703",
+        "poolId": "tsla-four-rehearsal",
+        "name": "Test Rocket",
+        "symbol": "ROCKET",
+        "presetId": "1795700948232",
+        "vault": "0x69830EACc0Fa7e03cE96299B867Ac03fe86883Fb",
+        "migrateModule": "0xf54aa4dD8D40d1D0822B15aAcA8864d7643c90d4",
+        "customData": "0x9Aacf45FaEd26Ce2A755Ddb65a87521B3190f50F",
+        "branch": "pool",
+        "pair": "0x45e6Cdb8a04B4f3640c655cC81f7870a66933Aeb",
+        "phase": "Migrated",
+        "createTx": "0x6de31e3ce53289dc50ee3706c2777e63d5814437fc1829414583782922e7461a",
+        "migrateTx": "0x8359891ff4e49357a7607f5df2fb49562ce04716ca14c2cc6c8b03220cbe99fb",
+        "hidden": true
       }
     ],
     "baselinePresetId": "1795700944983",
@@ -169,6 +199,8 @@
   "erc8004": {
     "identity": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
     "reputation": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
-    "agentId": null
+    "agentId": 2931,
+    "agentWallet": "0xC93c130FEee9170DeE0fc42797a75150b692eaA4",
+    "registerTx": "0xf71a2ec2509b369b19815db0f898c5359926a85eae2855e2d426636cb848e044"
   }
 }
