@@ -10,6 +10,7 @@ if (leaked.length > 0) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  devIndicators: false,
   poweredByHeader: false,
   eslint: { ignoreDuringBuilds: true },
   // Four pages: Markets (/), Trade (/trade/[id]), Launchpad, Transparency. Older routes redirect (temporary, so
