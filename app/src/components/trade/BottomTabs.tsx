@@ -108,7 +108,8 @@ function Positions({ d, change24h, onOrder }: { d: PoolDetail; change24h?: numbe
 
 // ------------------------------------------------------------------ pool
 
-function vaultOf(source: string, id: string) {
+function vaultOf(source: string, id: string, m?: PoolDetail["meta"]) {
+  if (m?.launcher) return addr(m.addresses?.backstopVault);
   return source === "flap" ? addr(launcherForPool(id)?.vault) : source === "four" ? addr(deployments97.openfour.backstopTreasury) : undefined;
 }
 
@@ -116,7 +117,7 @@ function PoolTab({ d }: { d: PoolDetail }) {
   const m = d.meta!;
   const s = d.snap;
   if (!s) return <div className="px-4 py-8 text-center text-sm text-muted">{d.loading ? "Reading the pool…" : "Pool state unavailable."}</div>;
-  const vault = vaultOf(m.source, m.id);
+  const vault = vaultOf(m.source, m.id, m);
   return (
     <div className="grid gap-px bg-line lg:grid-cols-3">
       <div className="bg-surface p-4">
@@ -350,7 +351,7 @@ function ActivityTab({ d }: { d: PoolDetail }) {
   if (m.isDemo) return <div className="px-4 py-8 text-center text-sm text-muted">Simulated market: no on-chain activity. Your simulated trades show as notifications.</div>;
   if (q.data?.offline) return <div className="p-4"><Offline note="Pool state, positions and the chart still work; recent events come back when the keeper API is up." /></div>;
   const mine = [m.addresses?.pool, m.addresses?.stabilityPool].filter(Boolean).map((x) => x!.toLowerCase());
-  const vault = vaultOf(m.source, m.id)?.toLowerCase();
+  const vault = vaultOf(m.source, m.id, m)?.toLowerCase();
   const rows = (q.data?.data?.events ?? [])
     .filter((e) => (e.chain_id ?? 97) === 97 && e.name && POOL_EVENTS.has(e.name) && e.name !== "Initialized")
     .filter((e) => {

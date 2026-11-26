@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { STOCK_NAMES } from "@/config/demoPools";
 import { useDemoExecutor, useRealExecutor } from "@/hooks/useExecutor";
 import { useCandles, useMarketStatus } from "@/hooks/useMarket";
-import { EXPECTED_REAL, useDemoPrices, useNow, usePool } from "@/hooks/usePools";
+import { EXPECTED_REAL, parseLaunchMarketId, useDemoPrices, useNow, usePool } from "@/hooks/usePools";
 import { stats24h, type Interval } from "@/lib/candles";
 import { fmtAge, fmtLev, fmtPct, fmtUsd } from "@/lib/format";
 import { rememberMarket } from "../Header";
@@ -54,7 +54,8 @@ export function TradeView({ id }: { id: string }) {
   }, []);
 
   if (!m) {
-    const e = EXPECTED_REAL.find((x) => x.id === id);
+    const lm = parseLaunchMarketId(id);
+    const e = EXPECTED_REAL.find((x) => x.id === id) ?? (lm ? { symbol: lm.symbol, kind: "flap" as const } : undefined);
     return <NotOpen id={id} symbol={e?.symbol} kind={e?.kind} searching={d.discovering} refPrice={e ? prices.data?.prices[e.symbol]?.price : undefined} />;
   }
 

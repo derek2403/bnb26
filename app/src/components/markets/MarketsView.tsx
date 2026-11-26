@@ -7,7 +7,7 @@ import { STOCK_NAMES } from "@/config/demoPools";
 import { fetchCandles } from "@/hooks/useMarket";
 import { useDemoPrices, useNow, usePoolList, type PoolRow } from "@/hooks/usePools";
 import { stats24h, syntheticCandles, type Candle } from "@/lib/candles";
-import { fmtLev, fmtPct, fmtUsd } from "@/lib/format";
+import { fmtLev, fmtNum, fmtPct, fmtUsd } from "@/lib/format";
 import { Change, Seg, SourceBadge, TickerIcon } from "../ui";
 import { Sparkline } from "../Sparkline";
 
@@ -18,6 +18,11 @@ type Market = {
   launchpad: string;
   live: boolean;
   pending?: boolean;
+  /** Pre-funding launch created on "Launch a market": pill text, raise progress and the row action. */
+  pill?: string;
+  sub?: string;
+  action?: string;
+  note?: string;
   price?: number;
   change?: number;
   spark: number[];
@@ -41,7 +46,7 @@ function sparkOf(c: Candle[] | undefined): number[] {
 
 export function MarketsView() {
   const router = useRouter();
-  const { rows, pending } = usePoolList();
+  const { rows, pending, launches } = usePoolList();
   const prices = useDemoPrices();
   const now = useNow(30_000);
   const [filter, setFilter] = useState<Filter>("all");
@@ -93,13 +98,32 @@ export function MarketsView() {
       const ref = prices.data?.prices[p.symbol];
       out.push({ id: p.id, symbol: p.symbol, name: STOCK_NAMES[p.symbol] ?? p.symbol, launchpad: p.kind === "flap" ? "Flap" : "Four.meme", live: true, pending: true, price: ref?.price, change: ref?.change24h !== undefined ? ref.change24h / 100 : undefined, spark: [] });
     }
+    for (const l of launches) {
+      const ref = prices.data?.prices[l.symbol];
+      const bnb = (v?: number) => (v === undefined ? "–" : fmtNum(v, 4));
+      out.push({
+        id: l.id,
+        symbol: l.symbol,
+        name: l.name,
+        launchpad: "Flap",
+        live: true,
+        pending: true,
+        pill: l.launched ? "Opening" : l.failed ? "Raise ended" : "Pre-funding",
+        sub: `${bnb(l.raised)} / ${bnb(l.target)} tBNB`,
+        action: l.launched || l.failed ? "Launchpad" : "Fund",
+        note: l.launched ? "opening the pool" : l.failed ? "raise ended" : "opens when funded",
+        price: ref?.price,
+        change: ref?.change24h !== undefined ? ref.change24h / 100 : undefined,
+        spark: [],
+      });
+    }
     for (const r of rows.filter((x) => x.meta.isDemo)) {
       const c = r.snap ? syntheticCandles(r.meta.id, "1h", r.snap.price, now, SPARK_BARS + 2) : undefined;
       out.push(fromRow(r, c));
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, pending, prices.data, now, candleQs.map((c) => c.dataUpdatedAt).join(",")]);
+  }, [rows, pending, launches, prices.data, now, candleQs.map((c) => c.dataUpdatedAt).join(",")]);
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -108,7 +132,9 @@ export function MarketsView() {
       const val = (m: Market) => (sort.key === "price" ? m.price : sort.key === "change" ? m.change : sort.key === "lev" ? m.lev : sort.key === "cr" ? (Number.isFinite(m.cr) ? m.cr : 1e9) : m.tvl) ?? -Infinity;
       list = [...list].sort((a, b) => (val(a) - val(b)) * sort.dir);
     } else {
-      list = [...list].sort((a, b) => Number(b.live) - Number(a.live) || (b.tvl ?? 0) - (a.tvl ?? 0));
+      // The headline market stays first; then live pools by TVL, launches, simulated markets.
+      const top = (m: Market) => Number(m.id === "nvda-flap");
+      list = [...list].sort((a, b) => Number(b.live) - Number(a.live) || top(b) - top(a) || (b.tvl ?? 0) - (a.tvl ?? 0));
     }
     return list;
   }, [markets, filter, sort, q]);
@@ -194,9 +220,12 @@ export function MarketsView() {
                         <span className="flex items-center gap-1.5">
                           <span className="font-medium text-ink">{m.symbol}</span>
                           <span className="num hidden text-xs text-lever sm:inline">x{m.symbol}</span>
-                          {m.pending && <span className="pill border-warn/40 text-warn">Launching</span>}
+                          {m.pending && <span className="pill border-warn/40 text-warn">{m.pill ?? "Launching"}</span>}
                         </span>
-                        <span className="block max-w-[140px] truncate text-xs text-muted sm:max-w-none">{m.name}</span>
+                        <span className="block max-w-[140px] truncate text-xs text-muted sm:max-w-none">
+                          {m.name}
+                          {m.sub && <span className="num text-faint"> · {m.sub}</span>}
+                        </span>
                       </span>
                     </Link>
                   </td>
@@ -205,7 +234,7 @@ export function MarketsView() {
                     <Change v={m.change} />
                   </td>
                   <td className="td hidden text-right lg:table-cell">
-                    <span className="inline-flex justify-end">{m.spark.length > 1 ? <Sparkline values={m.spark} /> : <span className="text-xs text-faint">{m.pending ? "opens on graduation" : "–"}</span>}</span>
+                    <span className="inline-flex justify-end">{m.spark.length > 1 ? <Sparkline values={m.spark} /> : <span className="text-xs text-faint">{m.pending ? (m.note ?? "opens on graduation") : "–"}</span>}</span>
                   </td>
                   <td className="td num hidden text-right text-lever md:table-cell">{m.nav !== undefined ? fmtUsd(m.nav, { digits: m.nav >= 100 ? 2 : 4 }) : "–"}</td>
                   <td className="td num hidden text-right text-lever sm:table-cell">{m.lev !== undefined ? fmtLev(m.lev) : "–"}</td>
@@ -215,8 +244,8 @@ export function MarketsView() {
                     <SourceBadge label={m.launchpad} />
                   </td>
                   <td className="td hidden text-right sm:table-cell">
-                    <Link href={href} className={m.pending ? "btn btn-sm" : "btn-primary btn-sm"} onClick={(e) => e.stopPropagation()}>
-                      {m.pending ? "Launchpad" : "Trade"}
+                    <Link href={href} className={m.pending && m.action !== "Fund" ? "btn btn-sm" : "btn-primary btn-sm"} onClick={(e) => e.stopPropagation()}>
+                      {m.pending ? (m.action ?? "Launchpad") : "Trade"}
                     </Link>
                   </td>
                 </tr>
