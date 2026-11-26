@@ -29,6 +29,9 @@ type PoolAction = "mintLever" | "mintStable" | "redeemStable" | "redeemLever" | 
 type Tab = PoolAction | "insurance";
 type InsuranceAction = "deposit" | "withdraw";
 
+// redeemFeeBps of the pool (0.2%), applied to redeemStable, redeemLever and redeemPair.
+const REDEEM_FEE_BPS = 20n;
+
 const TABS: Tab[] = ["mintLever", "mintStable", "redeemStable", "redeemLever", "redeemPair", "insurance"];
 const MODE_KEYS = ["unseeded", "normal", "stability", "underwater", "noPrice"];
 
@@ -104,7 +107,10 @@ function usdText(value: bigint | null | undefined, precision = 2) {
 }
 
 function leverageText(value: bigint | null | undefined) {
-  return value === null || value === undefined ? null : formatTokenAmount(value, 18, 2) + "x";
+  if (value === null || value === undefined) return null;
+  // The pool reports uint256 max when equity is zero or negative.
+  if (value > 10n ** 24n) return "∞";
+  return formatTokenAmount(value, 18, 2) + "x";
 }
 
 function ratioText(value: bigint | null | undefined) {
@@ -377,7 +383,7 @@ export default function SplitstockPoolApp() {
             let xMax = supply > 0n ? (value * levered * 1001n) / (supply * 1000n) : 0n;
             if (user?.x !== null && user?.x !== undefined && xMax > user.x) xMax = user.x;
             const [sBurned, xBurned, cOut, uOut] = readTuple(await sdk.readContract({ address: POOL, abi: poolAbi, functionName: "previewRedeemPair", args: [value, xMax] }));
-            return { sBurned, xBurned, cOut, uOut, xMax };
+            return { sBurned, xBurned, cOut, uOut, xMax, feeBps: REDEEM_FEE_BPS };
           }
           default:
             return {};
@@ -441,7 +447,9 @@ export default function SplitstockPoolApp() {
 
   const disabledReason = !state
     ? t("states.loading")
-    : !amount || amount <= 0n
+    : tab === "redeemPair" && user?.x === 0n
+      ? t("errors.needsPair")
+      : !amount || amount <= 0n
       ? t("errors.enterAmount")
       : insufficient
         ? t("errors.insufficient", undefined, { token: inputUnit })
