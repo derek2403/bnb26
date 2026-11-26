@@ -1,0 +1,36 @@
+{
+  "name": "splitstock-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "sync:deployments": "node scripts/sync-deployments.mjs",
+    "check:env": "node scripts/check-env.mjs",
+    "predev": "npm run sync:deployments",
+    "dev": "next dev",
+    "prebuild": "npm run check:env && npm run sync:deployments",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "abi": "node scripts/gen-abi.mjs"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "2.2.11",
+    "@tanstack/react-query": "5.105.0",
+    "next": "15.5.29",
+    "react": "19.1.10",
+    "react-dom": "19.1.10",
+    "server-only": "0.0.1",
+    "viem": "2.56.9",
+    "wagmi": "2.19.5"
+  },
+  "devDependencies": {
+    "@next/env": "15.5.29",
+    "@types/node": "22.10.2",
+    "@types/react": "19.1.17",
+    "@types/react-dom": "19.1.11",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.9.3"
+  }
+}
