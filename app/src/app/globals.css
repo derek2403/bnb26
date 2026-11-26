@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 247 249 252;
+  --surface: 255 255 255;
+  --surface-2: 241 245 249;
+  --line: 224 230 238;
+  --ink: 15 23 42;
+  --muted: 71 85 105;
+  --faint: 148 163 184;
+  --stable: 37 99 235;
+  --stable-soft: 219 234 254;
+  --lever: 217 119 6;
+  --lever-soft: 254 243 199;
+  --good: 22 163 74;
+  --warn: 202 138 4;
+  --bad: 220 38 38;
+  /* chart categorical order (validated: dataviz validate_palette, light surface) */
+  --chart-1: #d97706;
+  --chart-2: #7c3aed;
+  --chart-3: #0891b2;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: 8 11 17;
+  --surface: 16 21 30;
+  --surface-2: 23 29 41;
+  --line: 36 44 59;
+  --ink: 229 235 244;
+  --muted: 150 163 184;
+  --faint: 98 112 134;
+  --stable: 96 165 250;
+  --stable-soft: 21 36 77;
+  --lever: 251 191 36;
+  --lever-soft: 61 42 9;
+  --good: 74 222 128;
+  --warn: 250 204 21;
+  --bad: 248 113 113;
+  --chart-1: #c97a06;
+  --chart-2: #9061f9;
+  --chart-3: #0f9fbf;
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+}
+
+body {
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-line bg-surface p-4 sm:p-5;
+  }
+  .card-title {
+    @apply text-sm font-semibold text-ink;
+  }
+  .label {
+    @apply text-[11px] font-medium uppercase tracking-wide text-faint;
+  }
+  .num {
+    @apply font-mono tabular-nums;
+  }
+  .btn {
+    @apply inline-flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn border-transparent bg-ink text-surface hover:bg-ink/90;
+  }
+  .btn-stable {
+    @apply btn border-transparent bg-stable text-white hover:bg-stable/90;
+  }
+  .btn-lever {
+    @apply btn border-transparent bg-lever text-white hover:bg-lever/90 dark:text-black;
+  }
+  .btn-sm {
+    @apply min-h-[30px] px-2.5 py-1 text-xs;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none placeholder:text-faint focus:border-stable focus:ring-2 focus:ring-stable/20;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface2 px-2 py-0.5 text-[11px] font-medium text-muted;
+  }
+  .tab {
+    @apply rounded-md px-3 py-1.5 text-sm font-medium text-muted hover:text-ink;
+  }
+  .tab-active {
+    @apply bg-surface text-ink shadow-sm;
+  }
+  .link {
+    @apply text-stable hover:underline;
+  }
+  .table-head {
+    @apply px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-faint;
+  }
+  .table-cell {
+    @apply px-3 py-3 text-sm;
+  }
+}
