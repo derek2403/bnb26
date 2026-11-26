@@ -3,22 +3,24 @@ import { useQuery } from "@tanstack/react-query";
 import { usePublicClient } from "wagmi";
 import { bscTestnet } from "viem/chains";
 import type { Abi, AbiEvent, Address } from "viem";
-import { AtlasMirrorAbi, LeveragePoolAbi, OpenFourCoreAbi, RiskOracleAbi, SplitLauncherAbi } from "@/abi";
+import { AtlasMirrorAbi, BackstopTreasuryAbi, BackstopVaultAbi, LeveragePoolAbi, OpenFourCoreAbi, RiskOracleAbi, SplitLauncherAbi } from "@/abi";
 import { txUrl } from "@/config/chains";
 import { addr, deployments97, oracleFor } from "@/config/deployments";
 import { useRealMetas } from "@/hooks/usePools";
 import { fmtTime, short } from "@/lib/format";
 import { Card, useApi } from "./ui";
 
-// The five events that prove the demo story, newest first: Atlas price mirrored, CMC snapshot posted, sell zone
-// fired, Flap pool opened, Four.meme migration executed. Source: the keeper's indexer when it is up, else a
-// direct eth_getLogs over the latest blocks.
-const NAMES = ["Mirrored", "CmcSnapshot", "SellZone", "PoolOpened", "MigrateExecuted"] as const;
+// The events that prove the story, newest first: Atlas price mirrored, CMC snapshot posted, AI agent proposal,
+// sell zone fired, insurance vault defended a pool, Flap pool opened, Four.meme graduation executed. Source: the
+// keeper's indexer when it is up, else a direct eth_getLogs over the latest blocks.
+const NAMES = ["Mirrored", "CmcSnapshot", "AgentProposal", "SellZone", "Defended", "PoolOpened", "MigrateExecuted"] as const;
 const WHAT: Record<string, string> = {
   Mirrored: "Atlas price mirrored from BSC mainnet",
   CmcSnapshot: "CMC snapshot posted to the RiskOracle",
+  AgentProposal: "AI risk agent proposed stricter limits",
   SellZone: "Sell zone sold stock for USDC",
-  PoolOpened: "Flap launcher opened the NVDA pool",
+  Defended: "Insurance vault covered a pool shortfall",
+  PoolOpened: "Flap launch opened the NVDA pool",
   MigrateExecuted: "Four.meme graduation opened the TSLA pool",
 };
 const LOOKBACK = 4_000n;
@@ -48,6 +50,9 @@ export function ProofEvents() {
   push(addr(oracleFor("NVDA")?.mirror), AtlasMirrorAbi, "Mirrored");
   push(addr(oracleFor("TSLA")?.mirror), AtlasMirrorAbi, "Mirrored");
   push(addr(deployments97.core.riskOracle), RiskOracleAbi, "CmcSnapshot");
+  push(addr(deployments97.core.riskOracle), RiskOracleAbi, "AgentProposal");
+  for (const l of deployments97.flap.launchers) push(addr(l.vault), BackstopVaultAbi, "Defended");
+  push(addr(deployments97.openfour.backstopTreasury), BackstopTreasuryAbi, "Defended");
   for (const p of [...new Set(poolAddrs.map((a) => a.toLowerCase()))]) push(p as Address, LeveragePoolAbi, "SellZone");
   for (const l of deployments97.flap.launchers) push(addr(l.launcher), SplitLauncherAbi, "PoolOpened");
   push(addr(deployments97.openfour.core), OpenFourCoreAbi, "MigrateExecuted");
@@ -77,7 +82,14 @@ export function ProofEvents() {
     },
   });
 
-  const rows = indexed.length ? indexed : chain.data?.rows ?? [];
+  // Launch events also live in the address book (openTx / migrateTx), so they show even when the indexer or the
+  // eth_getLogs window has not seen them.
+  const known: Row[] = [
+    ...deployments97.pools.filter((p) => p.kind === "flap" && !p.hidden && p.openTx).map((p) => ({ name: "PoolOpened", tx: p.openTx!, contract: p.openedBy })),
+    ...(deployments97.openfour.tokens as { hidden?: boolean; migrateTx?: string | null }[]).filter((t) => !t.hidden && t.migrateTx).map((t) => ({ name: "MigrateExecuted", tx: t.migrateTx!, contract: undefined })),
+  ];
+  const base = indexed.length ? indexed : chain.data?.rows ?? [];
+  const rows = [...base, ...known.filter((k) => !base.some((r) => r.name === k.name))];
   const latestOf = NAMES.map((n) => rows.find((r) => r.name === n));
 
   return (
@@ -92,7 +104,7 @@ export function ProofEvents() {
           return (
             <li key={n} className="flex flex-col gap-1 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
               <span className="min-w-0">
-                <span className="num font-medium text-ink">{n}</span>
+                <span className="num text-[13px] font-medium text-ink">{n}</span>
                 <span className="ml-2 text-xs text-muted">{WHAT[n]}</span>
               </span>
               <span className="flex shrink-0 items-center gap-3 text-xs">
