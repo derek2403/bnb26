@@ -97,5 +97,4 @@ f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and a leverage
 
 ## Team
 
-- `<NAME>`: `<ROLE>` · `<CONTACT>`
-- `<NAME>`: `<ROLE>` · `<CONTACT>`
+- Derek Liew: builder · GitHub [@derek2403](https://github.com/derek2403)

@@ -38,7 +38,7 @@ Each keeper snapshot posts `CmcSnapshot(refPrice, volBps, liqUsd, premiumBps, re
 ## How usage is verifiable
 
 - **Events:** `Mirrored` on each AtlasMirror, `CmcSnapshot` and `AgentProposal` on the RiskOracle.
-- **Hash-chained log:** every CMC and MCP call is logged with the keccak of its raw body; each entry hashes the previous one, and `LogAnchor` stores hourly Merkle roots. The Transparency page (`/transparency`) re-hashes a raw body in the browser and checks it against the on-chain `responseHash`.
+- **Hash-chained log:** every CMC and MCP call is logged with the keccak of its raw body; each entry hashes the previous one, and `LogAnchor` stores hourly Merkle roots (first anchor: 1,050 entries, tx [`0x8d4ab202…df9a`](https://testnet.bscscan.com/tx/0x8d4ab202858cb22fa80198192fcd2db6e1eea5756d86a7e09da4127511cddf9a)). The Transparency page (`/transparency`) re-hashes a raw body in the browser and checks it against the on-chain `responseHash`.
 - **Credits:** `/v1/key/info` is logged hourly beside our own sum of `credit_count`.
 
 ## Safety
@@ -52,3 +52,5 @@ The AI agent (ERC-8004 id 2931) can only tighten limits. NYSE hours and gaps are
 - Mainnet pool on the real NVDAB token, reading Atlas directly, with pull pricing in the pool.
 - More stocks (TSLA live, then AAPL, MSFT…).
 - Staking the backstop token launched on Flap into a market's insurance for a fee share, and staking it to open new stock markets.
+
+**Team and contact.** Derek Liew, GitHub [@derek2403](https://github.com/derek2403).

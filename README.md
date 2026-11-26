@@ -19,7 +19,7 @@ Nobody borrows, so nobody can be liquidated. Instead, a sell zone and a buy zone
 
 | | Flap → NVDA pool | Four.meme (OpenFour) → TSLA pool |
 |---|---|---|
-| Raise | Crowdfund in tBNB (`SplitLauncher`, Flap Pool Launch, 7777 tax token) | Fair launch quoted in mock tTSLA (our "MORE Pool Launch" preset on our own OpenFour fork) |
+| Raise | Crowdfund in tBNB (`SplitLauncher`, Flap Pool Launch, 7777 tax token) | Fair launch quoted in mock tTSLA (our "SplitStock Pool Launch" preset on our own OpenFour fork) |
 | Pool opened by | `SplitLauncher.openPool()` | `SplitPoolMigrateModule.executeMigration` at graduation |
 | First-loss x goes to | `BackstopVault` (Flap vault, funded by 50% of the token tax) | `BackstopTreasury` (preset author/partner fees) |
 | Fallback | `releaseSeed()` to the vault after 14 days | meme/tTSLA PancakeSwap pair after the grace window |
@@ -31,6 +31,22 @@ Loss order when the price falls: zones (rebalance) → StabilityPool → backsto
 Prior art: f(x) Protocol (AladdinDAO) splits ETH and BTC into a stable token and a leveraged token. MORE differs in four ways: it is backed by stock, its trigger comes from outside data, it handles market hours and gaps, and it deleverages through a DEX with a launch-funded backstop.
 
 **Limits.** The testnet assets are mocks labelled MOCK. The testnet price arrives through a relayed mirror. No real-money mainnet pool exists. The mainnet (56) contracts are read-only anchors.
+
+## CoinMarketCap × Atlas challenge: what the brief asks for and where it is
+
+| Requirement | How MORE meets it |
+|---|---|
+| A data source in a core product feature | Both are core. **Atlas** is the pool price: every mint, redeem, sell zone and buy zone reads it. **CoinMarketCap** sets the risk limits on-chain: the mint breaker, the sell-zone trigger, the fees and the size of each sell. |
+| CoinMarketCap: a live Pro API call | The keeper calls the Pro API every few minutes: `/v1/dex/token/price`, `/v1/k-line/candles`, `/v3/cryptocurrency/quotes/latest` (NVDAB id 40215), `/v5/real-world-assets/quotes/latest` (NVDA rwa_id 2), `/v1/dex/token/pools`, `/v3/fear-and-greed/latest` and `/v1/key/info`. The AI risk agent also reads CMC through its MCP server. The app's candle chart is CMC k-lines (`/api/candles` returns `"source":"cmc"`). |
+| Atlas: read an on-chain feed | The Atlas NVDAB feed on BSC mainnet, [`0xf25af129…ccda`](https://bscscan.com/address/0xf25af12920d408baf6211e9e90eda89df3d8ccda), is read each round and mirrored to BSC testnet, where the pools read it. Atlas BNB/USD on testnet values the insurance vault. Atlas pull payloads are verified on-chain as a second price. |
+| Deployed on BNB Chain | BSC testnet (chain 97). Addresses: [deployments/97.json](./deployments/97.json) and [docs/DEPLOYED.md](./docs/DEPLOYED.md). NVDA market pool: [`0x0CD8…D208`](https://testnet.bscscan.com/address/0x0CD861cd0dD919434019f18F71630D2F678CD208). RiskOracle: [`0x0411…1190`](https://testnet.bscscan.com/address/0x0411D501839553cc53cbbcE45eD87501DF531190). |
+| Working data calls, verifiable | Each CMC snapshot is posted on-chain as `CmcSnapshot` with `responseHash`, the keccak of the raw CMC response bodies. Every CMC and MCP call is also written to a hash-chained log, and its Merkle root is stored in `LogAnchor` [`0x96b3…3ca0`](https://testnet.bscscan.com/address/0x96b3F4BE973A314E73c9ACA81c206c7Fec5d3ca0). First anchor: 1,050 log entries, root `0x8417b2de…13ac`, tx [`0x8d4ab202…df9a`](https://testnet.bscscan.com/tx/0x8d4ab202858cb22fa80198192fcd2db6e1eea5756d86a7e09da4127511cddf9a). The keeper anchors hourly from then on. The app's Transparency page re-hashes a raw CMC response in the browser and checks it against the on-chain hash. |
+| Code access | This repository is public. |
+| Setup instructions | [Setup](#setup) and [Run order](#run-order-bsc-testnet-97) below. |
+| Demo, up to 3 minutes | Script: [docs/DEMO-FLOW.md](./docs/DEMO-FLOW.md). Video link: in the HackQuest submission. |
+| One-page write-up | [docs/WRITEUP.md](./docs/WRITEUP.md): the problem and audience, each feed and endpoint with its on-chain effect, the contract addresses, and what comes next. |
+| Team and contact | Derek Liew, GitHub [@derek2403](https://github.com/derek2403). |
+| API keys kept out of the front end and the repo | Keys live only in gitignored `.env` files and are read server-side. The build fails if any `NEXT_PUBLIC_*KEY*` variable exists. |
 
 ## Docs
 

@@ -14,7 +14,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOG_DIR="$ROOT/services/logs"
 PID_FILE="$LOG_DIR/keeper-97.pid"
 LOG_FILE="$LOG_DIR/keeper-97.log"
-JOBS="${KEEPER_JOBS:-mirror,cmc,risk,rebalance,accrue,backstop,openfour,indexer}"
+JOBS="${KEEPER_JOBS:-mirror,cmc,risk,rebalance,accrue,backstop,openfour,indexer,anchor}"
 API_PID="$LOG_DIR/api-97.pid"
 API_LOG="$LOG_DIR/api-97.log"
 # eth_getLogs for the indexer: the bnbchain data-seed RPC rejects it ("limit exceeded"); publicnode allows
