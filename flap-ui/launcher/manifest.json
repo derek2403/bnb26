@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 2,
+  "kind": "launcher-ui",
+  "artifactId": "splitstock-backstop-launcher",
+  "name": "SplitStock Backstop-first Crowdfund",
+  "chainId": 97,
+  "factoryAddress": "0x01013dce27c3f00cac8bf254e20d02fd3500ffd2",
+  "configContract": "launcher-config-preview/v1",
+  "surfaces": [
+    "launcher-config",
+    "launcher-ui"
+  ],
+  "entry": "Component.tsx",
+  "reads": {
+    "raised": {
+      "functionName": "raised",
+      "returns": "uint256"
+    },
+    "targetRaise": {
+      "functionName": "targetRaise",
+      "returns": "uint256"
+    },
+    "remaining": {
+      "functionName": "remaining",
+      "returns": "uint256"
+    },
+    "saleDeadline": {
+      "functionName": "saleDeadline",
+      "returns": "uint256"
+    },
+    "launched": {
+      "functionName": "launched",
+      "returns": "bool"
+    },
+    "token": {
+      "functionName": "token",
+      "returns": "address"
+    },
+    "predictedToken": {
+      "functionName": "predictedToken",
+      "returns": "address"
+    },
+    "pool": {
+      "functionName": "pool",
+      "returns": "address"
+    },
+    "backstopVault": {
+      "functionName": "backstopVault",
+      "returns": "address"
+    },
+    "backstopBufferUsd": {
+      "functionName": "backstopBufferUsd",
+      "returns": "uint256"
+    },
+    "contributions": {
+      "functionName": "contributions",
+      "returns": "uint256",
+      "account": true
+    },
+    "claimable": {
+      "functionName": "claimable",
+      "returns": "uint256",
+      "account": true
+    },
+    "boosted": {
+      "functionName": "boosted",
+      "returns": "bool",
+      "account": true
+    },
+    "failed": {
+      "functionName": "failed",
+      "returns": "bool"
+    },
+    "seedBalance": {
+      "functionName": "seedBalance",
+      "returns": "uint256"
+    },
+    "boostToken": {
+      "functionName": "boostToken",
+      "returns": "address"
+    }
+  },
+  "transactions": {
+    "create": true,
+    "actions": {
+      "contribute": "payable",
+      "contributeBoosted": "payable",
+      "claim": "nonpayable",
+      "refund": "nonpayable",
+      "openPool": "nonpayable"
+    }
+  }
+}

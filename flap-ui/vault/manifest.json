@@ -1,0 +1,19 @@
+{
+  "artifactId": "vaultui_splitstock-backstop_01M8BWG4VMJ8Q4XGCZC050GV74",
+  "name": "SplitStock BackstopVault",
+  "match": {
+    "bindings": [
+      {
+        "chainId": 97,
+        "factoryAddress": "0xA441ECBfd7a28c3b949C0672cbD637355e97F2C4",
+        "tokenAddresses": [
+          "0xfc500e99b8befc3c637503469153dfe928977777"
+        ]
+      }
+    ]
+  },
+  "i18n": [
+    "en",
+    "zh"
+  ]
+}
