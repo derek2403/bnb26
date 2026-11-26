@@ -9,7 +9,8 @@
 # its rebalance job must not trade the pool mid-prep) and restarts it on exit. Never prints a key.
 #
 # Steps: feed.reset() -> redeem all REHEARSAL sUSD (drains the mUSDC the sell zone left) -> rebalance() buy zone
-# until NONE (mUSDC -> stock) -> mintStable to L ~1.97 (under the 2.05 closed-market cap).
+# until NONE (mUSDC -> stock) -> mintStable to L ~1.97 (under the 2.05 closed-market cap; 2.00 while an agent
+# TIGHTEN is active) -> print the insurance vault's remaining ScenarioPool cover budget.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
@@ -77,3 +78,10 @@ if [ "$B" != "0" ]; then
   echo "mintStable $B"; send REHEARSAL_PRIVATE_KEY "$POOL" 'mintStable(uint256,uint256,uint256)' "$B" 0 $(( $(date +%s) + 1800 ))
 fi
 echo "ready:"; show
+# The -55% click can only show a cover if the insurance vault still has ScenarioPool budget: capLeft = min(20% of the
+# buffer per UTC day, 10% of all Flap fees ever received - already spent on the ScenarioPool). Each cover uses it up;
+# new Flap trading fees (dispatched by the keeper) refill it.
+VAULT=$(python3 -c 'import json;print(json.load(open("deployments/97.json"))["flap"]["launchers"][0]["vault"])')
+CAP=$(cast call "$VAULT" 'capLeft(address)(uint256)' "$POOL" | awk '{print $1}')
+BUF=$(cast call "$VAULT" 'bufferUsd()(uint256)' | awk '{print $1}')
+python3 -c "print('   vault buffer \${:.2f}, ScenarioPool cover budget {:.6f} tBNB{}'.format($BUF/1e18, $CAP/1e18, '' if $CAP > 0 else '  (0: -55% will show the loss order, not a cover)'))"
