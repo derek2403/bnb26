@@ -1,0 +1,41 @@
+{
+  "name": "@splitstock/services",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SplitStock keeper jobs, AI Risk Steward, indexer and API (BSC testnet 97 + mainnet 56 read-only).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "abi": "node scripts/gen-abi.mjs",
+    "check:public-api": "node scripts/check-public-api.mjs",
+    "keeper": "tsx src/cli.ts keeper run",
+    "agent": "tsx src/cli.ts agent run",
+    "api": "tsx src/cli.ts api",
+    "cli": "tsx src/cli.ts",
+    "db:migrate": "tsx src/cli.ts db migrate",
+    "start": "node dist/cli.js",
+    "keeper:once": "tsx src/cli.ts keeper once",
+    "agent:once": "tsx src/cli.ts agent once",
+    "verify-snapshot": "tsx src/cli.ts verify-snapshot",
+    "backtest": "tsx src/cli.ts backtest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@fastify/cors": "^11.4.3",
+    "@fastify/rate-limit": "^11.3.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "fastify": "^5.12.8",
+    "postgres": "^3.4.7",
+    "viem": "^2.58.7",
+    "zod": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.7",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

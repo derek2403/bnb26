@@ -1,0 +1,11 @@
+# Public entry point for the services API. Set API_DOMAIN in the environment (e.g. api.splitstock.example);
+# Caddy obtains TLS automatically. Only the API is exposed; Postgres, keeper and agent stay internal.
+{$API_DOMAIN:localhost} {
+	encode gzip
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+	reverse_proxy api:8080
+}
