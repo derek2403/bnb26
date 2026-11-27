@@ -25,8 +25,15 @@ const VENUES: { id: Venue; name: string; logo?: string; note: string }[] = [
   { id: "flap", name: "Flap", logo: "/partners/flap.png", note: "Token launch on Flap" },
   { id: "four", name: "Four.meme", logo: "/partners/fourmeme.png", note: "Token launch on OpenFour" },
 ];
-// MORE only: SandboxFactory.create() opens a pool on MORE's own PoolFactory from the user's wallet (one per wallet, NVDA).
-const DIRECT_FACTORY = addr(deployments97.core.sandboxFactory);
+// MORE only: SandboxFactory.create() opens a pool on MORE's own PoolFactory from the user's wallet.
+// Each stock has its own factory. One wallet can open one market for each stock.
+const DIRECT: Record<string, Address | undefined> = {
+  NVDA: addr(deployments97.core.sandboxFactory),
+  AAPL: addr(deployments97.core.sandboxFactoryAAPL),
+  TSLA: addr(deployments97.core.sandboxFactoryTSLA),
+};
+const tradeHref = (stock: string) => (stock === "NVDA" ? "/trade/sandbox" : `/trade/${stock.toLowerCase()}`);
+type StepState = "wait" | "run" | "done" | "skip" | "error";
 const LEV_MIN = 1.5;
 const LEV_MAX = 3;
 const LEV_GAP = 0.3; // smallest allowed distance between the two ends of the range
@@ -67,6 +74,7 @@ export function LaunchMarketForm() {
   const { openConnectModal } = useConnectModal();
 
   const [stock, setStock] = useState<string>(LIVE);
+  const DIRECT_FACTORY = DIRECT[stock];
   const [venues, setVenues] = useState<Venue[]>(["more"]);
   const toggleVenue = (v: Venue) => setVenues((cur) => (cur.includes(v) ? (cur.length > 1 ? cur.filter((x) => x !== v) : cur) : [...cur, v]));
   const [levLo, setLevLo] = useState(1.6);
@@ -74,7 +82,6 @@ export function LaunchMarketForm() {
   // The launcher contract stores one requested leverage, so the middle of the range is sent.
   const lev = Math.round(((levLo + levHi) / 2) * 10) / 10;
   const pct = (x: number) => ((x - LEV_MIN) / (LEV_MAX - LEV_MIN)) * 100;
-  const venueNames = VENUES.filter((v) => venues.includes(v.id)).map((v) => v.name).join(", ");
 
   // Which contracts the button calls, from the ticks: MORE -> our own factory, Flap -> the Flap launch.
   const wantMore = venues.includes("more");
@@ -93,15 +100,33 @@ export function LaunchMarketForm() {
   const myPool = (mine.data as { pool?: Address } | undefined)?.pool;
   const hasDirect = !!myPool && myPool !== zeroAddress;
   const [direct, setDirect] = useState<{ ok: boolean; text: string } | null>(null);
+  // Progress pop-up: which launches this press started, and the state of the MORE and Four.meme ones.
+  const [run, setRun] = useState<{ more: boolean; flap: boolean; four: boolean } | null>(null);
+  const [moreState, setMoreState] = useState<StepState>("wait");
+  const [fourState, setFourState] = useState<StepState>("wait");
   const [directBusy, setDirectBusy] = useState(false);
   const openDirect = async () => {
     if (!DIRECT_FACTORY) return false;
     setDirectBusy(true);
     setDirect(null);
+    setMoreState("run");
+    // A stock that the keeper does not serve needs a fresh reference price first, or the pool cannot mint sUSD.
+    if (stock === "AAPL") {
+      const ok = await fetch("/api/launch/ref-price", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ symbol: stock }) })
+        .then((x) => x.json() as Promise<{ ok: boolean; error?: string }>)
+        .catch(() => ({ ok: false, error: "The price service did not answer." }));
+      if (!ok.ok) {
+        setDirectBusy(false);
+        setMoreState("error");
+        setDirect({ ok: false, text: ok.error ?? "The reference price was not posted." });
+        return false;
+      }
+    }
     const r = await tx.send({ address: DIRECT_FACTORY, abi: SandboxFactoryAbi, functionName: "create", args: [], label: "Open the market on MORE" } as never);
     setDirectBusy(false);
     void mine.refetch();
     const ok = !!r && (r as { status?: string }).status === "success";
+    setMoreState(ok ? "done" : "error");
     setDirect(ok ? { ok: true, text: "Market opened on MORE, directly on our pool factory." } : { ok: false, text: "The market was not opened on MORE." });
     return ok;
   };
@@ -110,18 +135,20 @@ export function LaunchMarketForm() {
   // launch on OpenFour. That sells it out, and graduation opens the TSLA market. No wallet confirm.
   const [four, setFour] = useState<{ ok: boolean; text: string } | null>(null);
   const [fourBusy, setFourBusy] = useState(false);
+  const [fourPool, setFourPool] = useState<Address | null>(null);
   const launchFour = async () => {
     setFourBusy(true);
     setFour(null);
+    setFourState("run");
     try {
-      const res = await fetch("/api/launch/fund-four", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create" }) });
-      const j = (await res.json()) as { ok: boolean; error?: string; token?: Address; name?: string; symbol?: string; raise?: string; tx?: Hex };
-      if (j.ok && j.token) {
-        add({ launcher: j.token, token: j.token, stock: "TSLA", name: j.name ?? "TSLA Market", symbol: j.symbol ?? "TSLAM", targetLeverage: lev, targetRaise: j.raise ?? "4000000000000000000", tx: j.tx, createdAt: Date.now(), venue: "four" });
-        setFour({ ok: true, text: "Sent to Four.meme for pre-funding. The launch is listed under Your launches below." });
-      } else setFour({ ok: false, text: `Four.meme: ${j.error ?? "the launch failed"}.` });
+      const res = await fetch("/api/launch/create-four", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[]; name?: string; pool?: Address | null; token?: Address };
+      setFourPool(j.ok ? (j.pool ?? null) : null);
+      setFour(j.ok ? { ok: true, text: `${j.name ?? "The launch"} was created, sold out and graduated. Its TSLA market is open.` } : { ok: false, text: `${j.steps?.length ? `Done: ${j.steps.join("; ")}. Then: ` : ""}${j.error ?? "The launch failed."}` });
+      setFourState(j.ok ? "done" : "error");
     } catch {
-      setFour({ ok: false, text: "Four.meme: the launch failed. Try again." });
+      setFour({ ok: false, text: "The launch failed. Try again." });
+      setFourState("error");
     } finally {
       setFourBusy(false);
     }
@@ -184,7 +211,13 @@ export function LaunchMarketForm() {
       openConnectModal?.();
       return;
     }
-    // Four.meme alone needs no wallet: the server key signs it.
+    setRun({ more: wantMore, flap: wantFlap && !problem, four: wantFour });
+    setMoreState(wantMore && hasDirect ? "skip" : "wait");
+    setFourState("wait");
+    setFour(null);
+    setDirect(null);
+    // Four.meme needs no wallet: the server key signs it, so it runs beside the wallet steps.
+    if (wantFour) void launchFour();
     // 1. MORE: straight to our own contract.
     if (wantMore && !hasDirect) {
       const ok = await openDirect();
@@ -192,15 +225,9 @@ export function LaunchMarketForm() {
     }
     // 2. Flap: the pre-funded launch (only when ticked).
     if (wantFlap && !problem && target !== undefined && seedWei !== undefined) void flow.start(flapInput());
-    // 3. Four.meme: signed by the server key, so it runs beside the wallet steps.
-    if (wantFour && !fourProblem) void launchFour();
   };
-  // TSLA launches go through Four.meme; the other venues are NVDA-only on testnet.
-  useEffect(() => {
-    setVenues((cur) => (stock === "TSLA" ? ["four"] : cur.length === 1 && cur[0] === "four" ? ["more"] : cur));
-  }, [stock]);
   const flapProblem = wantFlap ? problem : null;
-  const directProblem = wantMore && stock !== LIVE ? "A direct market on MORE supports NVDA on testnet." : wantMore && !DIRECT_FACTORY ? "The MORE pool factory is not deployed on this network." : null;
+  const directProblem = wantMore && !DIRECT_FACTORY ? "A direct market on MORE supports NVDA, TSLA and AAPL on testnet." : null;
   const fourProblem = wantFour && stock !== "TSLA" ? "Four.meme launches support TSLA on testnet." : null;
   const nothingToDo = !wantFlap && !wantFour && (!wantMore || hasDirect);
   const blocked = !!directProblem || !!flapProblem || !!fourProblem || nothingToDo;
@@ -262,7 +289,7 @@ export function LaunchMarketForm() {
             <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
               {STOCKS.map((s) => {
                 const on = s === stock;
-                const live = s === LIVE;
+                const live = !!DIRECT[s];
                 return (
                   <button
                     key={s}
@@ -281,9 +308,9 @@ export function LaunchMarketForm() {
               })}
             </div>
             {stock === "TSLA" ? (
-              <p className="mt-2 text-xs text-muted">
-                Tesla, priced by the Atlas feed. TSLA markets launch through Four.meme (OpenFour) on testnet: the launch raises 4 tTSLA, and when it sells out, graduation opens the new TSLA market.
-              </p>
+              <p className="mt-2 text-xs text-muted">Tesla, priced by the Atlas feed. The market pairs sUSD with leveraged xTSLA. It can launch on MORE and on Four.meme together.</p>
+            ) : stock === "AAPL" ? (
+              <p className="mt-2 text-xs text-muted">Apple, with a test token and a test price on testnet. The market pairs sUSD with leveraged xAAPL.</p>
             ) : stock !== LIVE ? (
               <p className="mt-2 text-xs text-muted">{STOCK_NAMES[stock] ?? stock}: needs a tokenized stock and price feed on testnet before it can be launched.</p>
             ) : (
@@ -437,15 +464,23 @@ export function LaunchMarketForm() {
           </div>
           <dl className="mt-3 space-y-1.5 text-xs">
             <Row k="Market" v={`sUSD + x${stock}`} />
-            <Row k="Launch on" v={venueNames} />
             <Row k="Leverage range" v={`${levLo.toFixed(1)}x – ${levHi.toFixed(1)}x`} />
             <Row k="Deposit" v={depOk ? `${fmtNum(depNum, 3)} t${stock}` : "–"} />
             <Row k="Leveraged / stable" v={`${levShare}% / ${100 - levShare}%`} />
             <Row k="Starting leverage" v={`${startLev.toFixed(2)}x`} />
             <Row k="Funding fee" v={`${aliceRate || "–"}% a year`} />
             <Row k="Lending rate" v={`${bobRate || "–"}% a year`} />
-            <Row k="Wallet confirms" v={`${(wantMore && !hasDirect ? 1 : 0) + (wantFlap ? 2 : 0)}`} />
-            <Row k="Contract" v={[wantMore ? "MORE pool factory" : "", wantFlap ? "Flap portal" : "", wantFour ? "OpenFour" : ""].filter(Boolean).join(" + ")} />
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-muted">Contract</dt>
+              <dd className="flex items-center gap-1.5">
+                {VENUES.filter((v) => venues.includes(v.id)).map((v) => (
+                  <span key={v.id} className="inline-flex h-6 w-[52px] items-center justify-center rounded border border-line bg-surface" title={v.id === "more" ? "MORE pool factory" : v.id === "flap" ? "Flap portal" : "OpenFour"}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={v.logo} alt={v.name} className={v.id === "more" ? "h-[9px] w-auto dark:invert" : "h-4 w-4 rounded-[3px] object-contain"} />
+                  </span>
+                ))}
+              </dd>
+            </div>
           </dl>
           <button type="button" className="btn-primary mt-3 w-full" disabled={blocked || flow.busy || directBusy || fourBusy} onClick={() => void submit()}>
             {directBusy ? "Confirm in your wallet…" : fourBusy && !flow.busy ? "Sending to Four.meme…" : flow.busy ? (flow.step === "mining" ? "Finding a 7777 address…" : "Confirm in your wallet…") : editing ? "Save and relaunch the market" : "Launch the market"}
@@ -453,20 +488,18 @@ export function LaunchMarketForm() {
           {directProblem && <p className="mt-2 text-xs text-warn">{directProblem}</p>}
           {flapProblem && <p className="mt-2 text-xs text-warn">{flapProblem}</p>}
           {fourProblem && <p className="mt-2 text-xs text-warn">{fourProblem}</p>}
-          {four && <p className={`mt-2 break-words text-xs ${four.ok ? "text-good" : "text-bad"}`}>{four.text}</p>}
           {wantMore && hasDirect && (
             <p className="mt-2 text-xs text-muted">
-              This wallet already has a market on MORE:{" "}
+              This wallet already has a {stock} market on MORE:{" "}
               <a className="num link" href={addressUrl(myPool!)} target="_blank" rel="noreferrer">
                 {short(myPool!, 6)}
               </a>
               .{" "}
-              <Link href="/trade/sandbox" className="link">
+              <Link href={tradeHref(stock)} className="link">
                 Trade it
               </Link>
             </p>
           )}
-          {direct && <p className={`mt-2 text-xs ${direct.ok ? "text-good" : "text-bad"}`}>{direct.text}</p>}
           {!blocked && !flow.isConnected && flow.step === "idle" && <p className="mt-2 text-xs text-muted">You will be asked to connect a wallet first.</p>}
           {flow.step !== "idle" && flow.step !== "error" && (
             <p className={`mt-2 text-xs ${flow.step === "done" ? "text-good" : "text-muted"}`}>
@@ -482,6 +515,22 @@ export function LaunchMarketForm() {
           )}
         </div>
       </div>
+
+      {run && (
+        <LaunchProgress
+          run={run}
+          stock={stock}
+          more={{ state: moreState, text: moreState === "skip" ? "This wallet already has a market on MORE." : moreState === "run" ? "Confirm in your wallet…" : direct?.text }}
+          flap={{
+            state: flow.step === "done" ? "done" : flow.step === "error" ? "error" : flow.step === "idle" ? "wait" : "run",
+            text: flow.step === "error" ? flow.error ?? "The launch failed." : flow.step === "mining" ? `${STEP_TEXT.mining} ${flow.tries.toLocaleString()} tried` : STEP_TEXT[flow.step],
+          }}
+          four={{ state: fourState, text: fourState === "run" ? "Creating the launch, funding it and graduating it (about a minute)…" : four?.text }}
+          fourPool={fourPool ?? undefined}
+          pool={hasDirect ? myPool : undefined}
+          onClose={() => setRun(null)}
+        />
+      )}
 
       {list.length > 0 && (
         <div className="border-t border-line p-4">
@@ -699,6 +748,94 @@ function FourLaunchCard({ l, onPool }: { l: MyLaunch; onPool: (pool: Address) =>
         <a href={tokenUrl(l.launcher)} target="_blank" rel="noreferrer" className="btn btn-sm w-full">
           View the launch token
         </a>
+      </div>
+    </div>
+  );
+}
+
+function StepIcon({ state }: { state: StepState }) {
+  if (state === "run") return <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-line border-t-accent" aria-label="In progress" />;
+  if (state === "done" || state === "skip") return <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-good text-[12px] font-bold leading-none text-white">✓</span>;
+  if (state === "error") return <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-bad text-[12px] font-bold leading-none text-white">✕</span>;
+  return <span className="h-5 w-5 shrink-0 rounded-full border-2 border-line" aria-label="Waiting" />;
+}
+
+/** Pop-up that shows each ticked launch with a spinner while it runs and a tick when it is done. */
+function LaunchProgress({
+  run,
+  stock,
+  more,
+  flap,
+  four,
+  pool,
+  fourPool,
+  onClose,
+}: {
+  run: { more: boolean; flap: boolean; four: boolean };
+  stock: string;
+  more: { state: StepState; text?: string };
+  flap: { state: StepState; text?: string };
+  four: { state: StepState; text?: string };
+  pool?: Address;
+  fourPool?: Address;
+  onClose: () => void;
+}) {
+  const rows = [
+    run.more && { key: "more", logo: "/logos/more.png", wide: true, title: `Open the ${stock} market on MORE`, ...more },
+    run.flap && { key: "flap", logo: "/partners/flap.png", wide: false, title: `Launch the ${stock} market on Flap`, ...flap },
+    run.four && { key: "four", logo: "/partners/fourmeme.png", wide: false, title: "Launch the TSLA market on Four.meme", ...four },
+  ].filter(Boolean) as { key: string; logo: string; wide: boolean; title: string; state: StepState; text?: string }[];
+  const busy = rows.some((r) => r.state === "run" || r.state === "wait");
+  const failed = rows.some((r) => r.state === "error");
+  const waitLabel: Record<StepState, string> = { wait: "Waiting", run: "In progress", done: "Done", skip: "Already open", error: "Failed" };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={busy ? undefined : onClose}>
+      <div className="w-full max-w-[440px] rounded-card border border-line bg-surface p-5 shadow-xl" role="dialog" aria-modal="true" aria-label="Launch progress" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-[15px] font-semibold text-ink">{busy ? "Launching your market" : failed ? "Launch not complete" : "Your market is live"}</h3>
+          <button type="button" className="text-lg leading-none text-muted hover:text-ink" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <ul className="mt-4 space-y-3">
+          {rows.map((r) => (
+            <li key={r.key} className="flex items-start gap-3 rounded border border-line bg-surface2 px-3 py-3">
+              <span className="mt-0.5">
+                <StepIcon state={r.state} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[13px] font-semibold text-ink">{r.title}</span>
+                  <span className="flex h-6 w-[52px] shrink-0 items-center justify-center rounded border border-line bg-surface">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={r.logo} alt="" className={r.wide ? "h-[9px] w-auto dark:invert" : "h-4 w-4 rounded-[3px] object-contain"} />
+                  </span>
+                </span>
+                <span className={`mt-0.5 block break-words text-xs ${r.state === "error" ? "text-bad" : r.state === "done" || r.state === "skip" ? "text-good" : "text-muted"}`}>{r.text || waitLabel[r.state]}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          {fourPool && run.four && !busy && (
+            <a href={addressUrl(fourPool)} target="_blank" rel="noreferrer" className="btn btn-sm">
+              TSLA market on the explorer
+            </a>
+          )}
+          {pool && run.more && !busy && stock !== "NVDA" && (
+            <a href={addressUrl(pool)} target="_blank" rel="noreferrer" className="btn btn-sm">
+              {stock} market on the explorer
+            </a>
+          )}
+          {pool && run.more && !busy && (
+            <Link href={tradeHref(stock)} className="btn-primary btn-sm">
+              Trade my market
+            </Link>
+          )}
+          <button type="button" className="btn btn-sm" onClick={onClose}>
+            {busy ? "Hide" : "Close"}
+          </button>
+        </div>
       </div>
     </div>
   );
