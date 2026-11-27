@@ -54,6 +54,9 @@ export type Deployments = {
       | "sandboxFactory"
       | "sandboxFactoryAAPL"
       | "sandboxFactoryTSLA"
+      | "marketFactoryNVDA"
+      | "marketFactoryTSLA"
+      | "marketFactoryAAPL"
       | "creatorRegistrar"
       | "timelock"
       | "guardian",
