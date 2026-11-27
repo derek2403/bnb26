@@ -30,6 +30,10 @@ export type MyLaunch = {
   targetRaise: string; // wei, as a string (bigint is not JSON)
   tx?: Hex;
   createdAt: number;
+  /** "four": a launch on OpenFour (Four.meme); `launcher` then holds the launch token address. */
+  venue?: "four";
+  /** The market the launch opened, once known. */
+  pool?: Address;
 };
 
 const LS_LAUNCHES = "more.flapLaunches.v1";

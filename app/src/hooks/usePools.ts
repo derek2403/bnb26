@@ -226,7 +226,7 @@ export function useLaunchMarkets(wantId?: string): { metas: PoolMeta[]; launches
   const at = <T,>(i: number): T | undefined => (stage1.data?.[i]?.status === "success" ? (stage1.data[i].result as T) : undefined);
 
   const state = list.map((l, i) => {
-    const pool = addr(at<Address>(i * n));
+    const pool = addr(l.pool) ?? addr(at<Address>(i * n));
     return { entry: l, pool, raised: at<bigint>(i * n + 1), target: at<bigint>(i * n + 2), launched: at<boolean>(i * n + 3) ?? false, failed: at<boolean>(i * n + 4) ?? false, vault: addr(at<Address>(i * n + 5)), poolSymbol: at<string>(i * n + 6) };
   });
   const wanted = want ? (at<readonly Address[]>(list.length * n) ?? []).find((a) => a.toLowerCase().startsWith(want.prefix)) : undefined;
@@ -247,7 +247,7 @@ export function useLaunchMarkets(wantId?: string): { metas: PoolMeta[]; launches
     contracts: candidates.map((p) => ({ address: factory!, abi: PoolFactoryAbi, functionName: "poolInfo" as const, args: [p] as const, chainId: bscTestnet.id })),
   });
 
-  const stateKey = state.map((s) => `${s.entry.launcher}:${s.pool ?? ""}:${s.vault ?? ""}:${s.raised ?? ""}:${s.target ?? ""}:${s.launched}:${s.failed}:${s.entry.name}`).join("|");
+  const stateKey = state.map((s) => `${s.entry.launcher}:${s.pool ?? ""}:${s.vault ?? ""}:${s.raised ?? ""}:${s.target ?? ""}:${s.launched}:${s.failed}:${s.entry.name}:${s.entry.venue ?? ''}`).join("|");
   const metas = useMemo(() => {
     const out: PoolMeta[] = [];
     (stage2.data ?? []).forEach((r) => {
@@ -256,7 +256,7 @@ export function useLaunchMarkets(wantId?: string): { metas: PoolMeta[]; launches
       const from = state.find((s) => s.pool?.toLowerCase() === i.pool.toLowerCase());
       const id = launchMarketId(i.symbol, i.pool);
       if (out.some((m) => m.id === id)) return;
-      const base = metaFromDeployed({ id, symbol: i.symbol, kind: "flap", pool: i.pool, sUSD: i.sUSD, xToken: i.xToken, stabilityPool: i.stabilityPool, feed: i.feed, openedBy: i.creator, assetId: i.assetId });
+      const base = metaFromDeployed({ id, symbol: i.symbol, kind: from?.entry.venue === "four" ? "four" : "flap", pool: i.pool, sUSD: i.sUSD, xToken: i.xToken, stabilityPool: i.stabilityPool, feed: i.feed, openedBy: i.creator, assetId: i.assetId });
       out.push({
         ...base,
         name: from?.entry.name ?? `${i.symbol} Market`,

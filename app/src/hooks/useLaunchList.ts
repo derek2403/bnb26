@@ -19,6 +19,8 @@ export type LaunchEntry = {
   /** wei, as a string. */
   targetRaise?: string;
   createdAt?: number;
+  venue?: "four";
+  pool?: Address;
 };
 
 function readRaw(): string {
