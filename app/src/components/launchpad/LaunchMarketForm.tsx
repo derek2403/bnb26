@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { formatEther, parseEther, zeroAddress, type Address } from "viem";
+import { formatEther, parseAbi, parseEther, zeroAddress, type Address, type Hex } from "viem";
 import { bscTestnet } from "viem/chains";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { SandboxFactoryAbi, SplitLauncherAbi } from "@/abi";
+import { OpenFourCoreAbi, SandboxFactoryAbi, SplitLauncherAbi } from "@/abi";
 import { addr, deployments97 } from "@/config/deployments";
 import { useTx } from "@/hooks/useTx";
 import { addressUrl, tokenUrl, txUrl } from "@/config/chains";
@@ -114,9 +114,12 @@ export function LaunchMarketForm() {
     setFourBusy(true);
     setFour(null);
     try {
-      const res = await fetch("/api/launch/fund-four", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[] };
-      setFour(j.ok ? { ok: true, text: `Four.meme: ${j.steps?.length ? j.steps.join("; ") : "done"}.` } : { ok: false, text: `Four.meme: ${j.error ?? "the launch failed"}.` });
+      const res = await fetch("/api/launch/fund-four", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create" }) });
+      const j = (await res.json()) as { ok: boolean; error?: string; token?: Address; name?: string; symbol?: string; raise?: string; tx?: Hex };
+      if (j.ok && j.token) {
+        add({ launcher: j.token, token: j.token, stock: "TSLA", name: j.name ?? "TSLA Market", symbol: j.symbol ?? "TSLAM", targetLeverage: lev, targetRaise: j.raise ?? "4000000000000000000", tx: j.tx, createdAt: Date.now(), venue: "four" });
+        setFour({ ok: true, text: "Sent to Four.meme for pre-funding. The launch is listed under Your launches below." });
+      } else setFour({ ok: false, text: `Four.meme: ${j.error ?? "the launch failed"}.` });
     } catch {
       setFour({ ok: false, text: "Four.meme: the launch failed. Try again." });
     } finally {
@@ -190,12 +193,17 @@ export function LaunchMarketForm() {
     // 2. Flap: the pre-funded launch (only when ticked).
     if (wantFlap && !problem && target !== undefined && seedWei !== undefined) void flow.start(flapInput());
     // 3. Four.meme: signed by the server key, so it runs beside the wallet steps.
-    if (wantFour) void launchFour();
+    if (wantFour && !fourProblem) void launchFour();
   };
+  // TSLA launches go through Four.meme; the other venues are NVDA-only on testnet.
+  useEffect(() => {
+    setVenues((cur) => (stock === "TSLA" ? ["four"] : cur.length === 1 && cur[0] === "four" ? ["more"] : cur));
+  }, [stock]);
   const flapProblem = wantFlap ? problem : null;
   const directProblem = wantMore && stock !== LIVE ? "A direct market on MORE supports NVDA on testnet." : wantMore && !DIRECT_FACTORY ? "The MORE pool factory is not deployed on this network." : null;
+  const fourProblem = wantFour && stock !== "TSLA" ? "Four.meme launches support TSLA on testnet." : null;
   const nothingToDo = !wantFlap && !wantFour && (!wantMore || hasDirect);
-  const blocked = !!directProblem || !!flapProblem || nothingToDo;
+  const blocked = !!directProblem || !!flapProblem || !!fourProblem || nothingToDo;
 
   return (
     <section ref={formRef} id="open-market" className="mt-4 scroll-mt-20 rounded-card border border-line bg-surface">
@@ -273,16 +281,9 @@ export function LaunchMarketForm() {
               })}
             </div>
             {stock === "TSLA" ? (
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
-                <span>
-                  TSLA launches through Four.meme (OpenFour) on testnet: the{" "}
-                  <button type="button" className="link" onClick={() => window.dispatchEvent(new Event("more:show-four"))}>
-                    TSLA Market launch
-                  </button>{" "}
-                  is pre-funding. Its last buy sells it out and opens the TSLA market.
-                </span>
-                <FundFour />
-              </div>
+              <p className="mt-2 text-xs text-muted">
+                Tesla, priced by the Atlas feed. TSLA markets launch through Four.meme (OpenFour) on testnet: the launch raises 4 tTSLA, and when it sells out, graduation opens the new TSLA market.
+              </p>
             ) : stock !== LIVE ? (
               <p className="mt-2 text-xs text-muted">{STOCK_NAMES[stock] ?? stock}: needs a tokenized stock and price feed on testnet before it can be launched.</p>
             ) : (
@@ -447,10 +448,11 @@ export function LaunchMarketForm() {
             <Row k="Contract" v={[wantMore ? "MORE pool factory" : "", wantFlap ? "Flap portal" : "", wantFour ? "OpenFour" : ""].filter(Boolean).join(" + ")} />
           </dl>
           <button type="button" className="btn-primary mt-3 w-full" disabled={blocked || flow.busy || directBusy || fourBusy} onClick={() => void submit()}>
-            {directBusy ? "Confirm in your wallet…" : fourBusy && !flow.busy ? "Launching on Four.meme…" : flow.busy ? (flow.step === "mining" ? "Finding a 7777 address…" : "Confirm in your wallet…") : editing ? "Save and relaunch the market" : "Launch the market"}
+            {directBusy ? "Confirm in your wallet…" : fourBusy && !flow.busy ? "Sending to Four.meme…" : flow.busy ? (flow.step === "mining" ? "Finding a 7777 address…" : "Confirm in your wallet…") : editing ? "Save and relaunch the market" : "Launch the market"}
           </button>
           {directProblem && <p className="mt-2 text-xs text-warn">{directProblem}</p>}
           {flapProblem && <p className="mt-2 text-xs text-warn">{flapProblem}</p>}
+          {fourProblem && <p className="mt-2 text-xs text-warn">{fourProblem}</p>}
           {four && <p className={`mt-2 break-words text-xs ${four.ok ? "text-good" : "text-bad"}`}>{four.text}</p>}
           {wantMore && hasDirect && (
             <p className="mt-2 text-xs text-muted">
@@ -486,7 +488,7 @@ export function LaunchMarketForm() {
           <div className="label">Your launches</div>
           <div className="mt-2 grid gap-3 md:grid-cols-2">
             {list.map((l) => (
-              <LaunchCard key={l.launcher} l={l} />
+              l.venue === "four" ? <FourLaunchCard key={l.launcher} l={l} onPool={(pool) => add({ ...l, pool })} /> : <LaunchCard key={l.launcher} l={l} />
             ))}
           </div>
         </div>
@@ -601,29 +603,103 @@ function LaunchCard({ l }: { l: MyLaunch }) {
   );
 }
 
-/** Demo funding for the TSLA Market launch on Four.meme: a server-side testnet key buys the rest, which graduates it. */
-function FundFour() {
-  const [busy, setBusy] = useState(false);
+const fourVaultAbi = parseAbi(["function totalRaised() view returns (uint256)", "function remainingForSale() view returns (uint256)"]);
+const fourMigrateAbi = parseAbi([
+  "function lastGraduation() view returns ((uint8 branch, address pair, address pool, address sUSD, address xToken, address stabilityPool, uint256 quoteUsed, uint256 tokenUsed, uint256 seedAmount, uint256 mintAmount) g)",
+]);
+const FOUR_CORE = addr(deployments97.openfour.core);
+
+/** A TSLA Market launch on Four.meme (OpenFour). Pre-funding until it sells out; graduation opens the TSLA market. */
+function FourLaunchCard({ l, onPool }: { l: MyLaunch; onPool: (pool: Address) => void }) {
+  const core = useReadContract({ address: FOUR_CORE, abi: OpenFourCoreAbi, functionName: "tokens", args: [l.launcher], chainId: bscTestnet.id, query: { enabled: !!FOUR_CORE, staleTime: 600_000 } });
+  const t = core.data as readonly unknown[] | undefined;
+  const vault = t?.[10] as Address | undefined;
+  const migrate = t?.[13] as Address | undefined;
+  const target = (t?.[8] as bigint | undefined) ?? BigInt(l.targetRaise);
+  const r = useReadContracts({
+    allowFailure: true,
+    query: { enabled: !!vault && !!migrate, refetchInterval: 10_000 },
+    contracts: [
+      { address: vault!, abi: fourVaultAbi, functionName: "totalRaised", chainId: bscTestnet.id },
+      { address: migrate!, abi: fourMigrateAbi, functionName: "lastGraduation", chainId: bscTestnet.id },
+    ],
+  });
+  const raised = r.data?.[0]?.status === "success" ? (r.data[0].result as bigint) : undefined;
+  const grad = r.data?.[1]?.status === "success" ? (r.data[1].result as { pool: Address }) : undefined;
+  const pool = grad && grad.pool !== zeroAddress ? grad.pool : l.pool;
+  useEffect(() => {
+    if (pool && pool !== l.pool) onPool(pool);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pool]);
+  const pct = raised !== undefined && target > 0n ? Math.min(100, Number((raised * 10000n) / target) / 100) : 0;
+  const [funding, setFunding] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const run = async () => {
-    setBusy(true);
+  // Demo funding: a server-side testnet key buys the rest of the sale, which graduates it (no wallet popup).
+  const fund = async () => {
+    setFunding(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/launch/fund-four", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[] };
-      setMsg(j.ok ? { ok: true, text: j.steps?.length ? `Done: ${j.steps.join("; ")}.` : "Done." } : { ok: false, text: j.error ?? "Funding failed." });
+      const res = await fetch("/api/launch/fund-four", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: l.launcher }) });
+      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[]; pool?: Address };
+      if (j.ok && j.pool) onPool(j.pool);
+      setMsg(j.ok ? { ok: true, text: j.steps?.length ? `Done: ${j.steps.join("; ")}.` : "The market is open." } : { ok: false, text: j.error ?? "Funding failed." });
     } catch {
       setMsg({ ok: false, text: "Funding failed. Try again." });
     } finally {
-      setBusy(false);
+      setFunding(false);
+      void r.refetch();
     }
   };
+  const status = pool ? "Market open" : raised === undefined ? "…" : "Pre-funding";
   return (
-    <span className="flex flex-wrap items-center gap-2">
-      <button className="btn-primary btn-sm" disabled={busy} onClick={run}>
-        {busy ? "Funding and graduating…" : "Fund and open the TSLA market"}
-      </button>
-      {msg && <span className={msg.ok ? "text-good" : "text-bad"}>{msg.text}</span>}
-    </span>
+    <div className="min-w-0 rounded-card border border-line bg-surface p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <TickerIcon sym={l.stock} size={24} />
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-ink">{l.name}</div>
+            <div className="num text-2xs text-faint">
+              ${l.symbol} · wants {l.targetLeverage.toFixed(1)}x · Four.meme
+            </div>
+          </div>
+        </div>
+        <span className={`pill ${pool ? "border-good/40 text-good" : ""}`}>{status}</span>
+      </div>
+      <div className="mt-3 h-1 overflow-hidden rounded-sm bg-surface2">
+        <div className="h-full bg-accent" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="num mt-1 text-2xs text-faint">
+        {fmtBnb(raised)} / {fmtBnb(target)} tTSLA · {pct.toFixed(0)}%
+      </div>
+      <div className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-2xs">
+        <span className="text-faint">Token</span>
+        <a className="num link truncate" href={tokenUrl(l.launcher)} target="_blank" rel="noreferrer" title={l.launcher}>
+          {short(l.launcher, 6)}
+        </a>
+        {l.tx && (
+          <>
+            <span className="text-faint">Tx</span>
+            <a className="num link truncate" href={txUrl(l.tx)} target="_blank" rel="noreferrer">
+              {short(l.tx, 6)}
+            </a>
+          </>
+        )}
+      </div>
+      {msg && <p className={`mt-2 text-2xs ${msg.ok ? "text-good" : "text-bad"}`}>{msg.text}</p>}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {pool ? (
+          <Link href={`/trade/${l.stock.toLowerCase()}-${pool.slice(2, 8).toLowerCase()}`} className="btn-primary btn-sm w-full">
+            Trade this market
+          </Link>
+        ) : (
+          <button className="btn-primary btn-sm w-full" disabled={funding || raised === undefined} onClick={fund}>
+            {funding ? "Funding and opening (about a minute)…" : "Fund and open the market"}
+          </button>
+        )}
+        <a href={tokenUrl(l.launcher)} target="_blank" rel="noreferrer" className="btn btn-sm w-full">
+          View the launch token
+        </a>
+      </div>
+    </div>
   );
 }
