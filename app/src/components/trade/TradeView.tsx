@@ -93,9 +93,6 @@ export function TradeView({ id }: { id: string }) {
             </span>
           </div>
         </div>
-        <button className="btn btn-sm ml-auto shrink-0 border-warn/40 text-warn hover:bg-warn/10" onClick={() => setStress(true)} title="Shock a sandbox copy of this market">
-          Stress test
-        </button>
       </div>
 
       {/* terminal */}
