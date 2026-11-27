@@ -9,7 +9,7 @@ import { toNum } from "@/lib/format";
 import type { PoolMeta } from "@/lib/types";
 import { metaForSandbox } from "./usePools";
 
-export const SANDBOX_FACTORY = addr(deployments97.core.sandboxFactory);
+export const SANDBOX_FACTORY = addr(deployments97.core.marketFactoryNVDA) ?? addr(deployments97.core.sandboxFactory);
 const C = bscTestnet.id;
 
 export type SandboxInfo = {
