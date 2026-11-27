@@ -32,13 +32,9 @@ function useTradeHref(path: string | null) {
 
 export function Logo() {
   return (
-    <span className="flex items-center gap-2 font-semibold tracking-tight text-ink">
-      <span className="inline-flex h-[18px] w-[18px] overflow-hidden rounded-[3px]" aria-hidden>
-        <span className="h-full w-1/2 bg-stable" />
-        <span className="h-full w-1/2 bg-lever" />
-      </span>
-      MORE
-    </span>
+    // Black wordmark on a transparent background (cut from public/logos/logo.png); inverted in dark mode.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/logos/more.png" alt="MORE" className="block h-[18px] w-auto dark:invert" />
   );
 }
 
