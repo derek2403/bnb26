@@ -79,11 +79,28 @@ export function TickerIcon({ sym, size = 28 }: { sym: string; size?: number }) {
 }
 
 /** "Opened by Flap" / "Opened by Four.meme" source badge. */
-export function SourceBadge({ label, short: compact = false }: { label: string; short?: boolean }) {
+const SOURCE_LOGO: Record<string, string> = { Flap: "/partners/flap.png", "Four.meme": "/partners/fourmeme.png" };
+
+export function SourceBadge({ label, short: _compact = false, iconOnly = false }: { label: string; short?: boolean; iconOnly?: boolean }) {
+  const logo = SOURCE_LOGO[label];
+  if (iconOnly && logo) {
+    // Logo only, in a box of a fixed size, so a row of badges lines up.
+    return (
+      <span className="inline-flex h-7 w-[72px] items-center justify-center rounded border border-line bg-surface" title={`Opened by ${label}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logo} alt={label} width={18} height={18} className="h-[18px] w-[18px] rounded-[3px] object-contain" />
+      </span>
+    );
+  }
   return (
-    <span className="pill">
-      <span className={`h-1.5 w-1.5 rounded-full ${label === "Flap" ? "bg-lever" : label === "Four.meme" ? "bg-stable" : "bg-faint"}`} />
-      {compact ? label : `Opened by ${label}`}
+    <span className="pill" title={`Opened by ${label}`}>
+      {logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt="" width={14} height={14} className="h-3.5 w-3.5 rounded-[3px] bg-white object-contain" />
+      ) : (
+        <span className="h-1.5 w-1.5 rounded-full bg-faint" />
+      )}
+      {label}
     </span>
   );
 }
