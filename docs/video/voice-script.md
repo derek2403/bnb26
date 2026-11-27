@@ -41,5 +41,6 @@ recorded.
 | 26 | Loan against MORE | [firm] A loan has a liquidation price and a penalty. MORE has none. |
 | 27 | Why Bob joins | [clear, honest] Lenders take Bob's side: a higher yield, for a higher risk. |
 | 28 | Lending rates | [confident] That can pay more than lending on Binance, Lista, or Aave. |
-| 29 | Create a market | [bright, inviting] MORE is not only a platform. It is a launchpad. Anyone can launch their own market: choose the stock, set the leverage range, the funding fee and the vault seed. Then anyone can join that market, as Alice or as Bob. |
-| 30 | End card | [confident, warm] MORE. Margin on R W A exposure, without liquidation. |
+| 29 | Create a market | [bright, inviting] MORE is not only a platform. It is a launchpad on Flap and Four.meme. Anyone can launch their own MORE market with their own config: the stock, the leverage range, the funding fee and the vault seed. Then anyone can join. |
+| 30 | Price and data | [clear, confident] For the price and the calculation, we use Atlas and CoinMarketCap. Atlas gives the live price. CoinMarketCap gives the volatility and the liquidity, which set when the pool sells and how much. If the two prices disagree, minting stops. |
+| 31 | End card | [confident, warm] MORE. Margin on R W A exposure, without liquidation. |
