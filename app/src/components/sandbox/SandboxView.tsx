@@ -9,7 +9,9 @@ import { usePool } from "@/hooks/usePools";
 import { useMySandbox } from "@/hooks/useSandbox";
 import { useSandboxBook } from "@/hooks/useSandboxBook";
 import { describeError, useTx } from "@/hooks/useTx";
+import type { Interval } from "@/lib/candles";
 import { fmtLev, fmtNum, fmtPct, fmtUsd, toNum } from "@/lib/format";
+import { CandleChart } from "../trade/CandleChart";
 import { Addr, CrGauge, LeverageGauge, ModePill, SplitBar, TickerIcon } from "../ui";
 
 const C = bscTestnet.id;
@@ -60,11 +62,15 @@ export function SandboxView() {
   const sb = useMySandbox(op?.operator ?? null);
   const d = usePool("sandbox", sb.meta);
   const s = d.snap;
+  // The leverage of the pool now. A new long position gets this leverage.
+  const levNow = s && Number.isFinite(s.leverage) ? fmtLev(s.leverage) : "2x";
   const u = d.user;
   const client = usePublicClient({ chainId: C });
   const { send, pending } = useTx();
   const [busy, setBusy] = useState<string | null>(null);
   const [amount, setAmount] = useState("1");
+  const [side, setSide] = useState<"long" | "stable">("long");
+  const [interval, setIntervalSel] = useState<Interval>("1h");
   const [log, setLog] = useState<LogRow[]>([]);
   const book = useSandboxBook(sb.pool, sb.meta?.addresses?.stabilityPool, address, sb.createdAt);
   const stakerBook = useSandboxBook(sb.pool, sb.meta?.addresses?.stabilityPool, sb.owner, sb.createdAt);
@@ -121,7 +127,9 @@ export function SandboxView() {
   const myShare = s && s.X > 0 ? posX / s.X : 0;
 
   // ------------------------------------------------------------- actions
-  type Api = { ok: boolean; error?: string; txs?: Hex[]; steps?: string[]; price?: number; zone?: { kind: "sell" | "buy"; levBefore?: number; levAfter?: number; sold?: number; out?: number; toStakers?: boolean } };
+  // A leverage above 100x means that the leveraged side is at or near zero.
+  const big = (x: number) => (x > 100 ? "above 100x" : fmtLev(x));
+  type Api = { ok: boolean; error?: string; txs?: Hex[]; steps?: string[]; price?: number; rebalances?: number; priceSteps?: number; zone?: { kind: "sell" | "buy"; levBefore?: number; levAfter?: number; sold?: number; out?: number; toStakers?: boolean } };
   const api = async (body: Record<string, unknown>): Promise<Api> => {
     const r = await fetch("/api/sandbox", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     return (await r.json()) as Api;
@@ -156,7 +164,7 @@ export function SandboxView() {
       } catch (e) {
         return push({ label: "Long 2x", tone: "bad", txs: [], text: `The pool won't open a position right now: ${describeError(e)}` });
       }
-      if (!(await approve(a.asset, pool, amt, "Approve tNVDA"))) return;
+      if (!(await approve(a.asset, pool, amt, "Approve NVDA"))) return;
       const r = await send({ address: pool, abi: LeveragePoolAbi, functionName: "mintLever", args: [amt, minOf(out), deadline()], label: "Long 2x" });
       if (!ok(r)) return;
       book.addReceipt(r);
@@ -164,7 +172,31 @@ export function SandboxView() {
       const xOut = ev?.args.out !== undefined ? toNum(ev.args.out) : toNum(out);
       const price = ev?.args.price !== undefined ? toNum(ev.args.price) : P;
       const c = toNum(amt, d.decimals.asset);
-      push({ label: "Long 2x", tone: "good", txs: [r.transactionHash], text: `Deposited ${fmtNum(c, 2)} tNVDA (${usd(c * price)} at ${usd(price)}) → ${fmtNum(xOut, 2)} xNVDA.` });
+      push({ label: "Long 2x", tone: "good", txs: [r.transactionHash], text: `Deposited ${fmtNum(c, 2)} NVDA (${usd(c * price)} at ${usd(price)}) → ${fmtNum(xOut, 2)} xNVDA.` });
+    });
+
+  // Stable side: deposit NVDA and get sUSD, a dollar claim on the pool.
+  const goStable = () =>
+    run("stable", async () => {
+      if (!pool || !a?.asset) return;
+      let amt: bigint;
+      try {
+        amt = parseUnits(amount || "0", d.decimals.asset);
+      } catch {
+        return;
+      }
+      if (amt <= 0n) return;
+      let out: bigint;
+      try {
+        [out] = (await client!.readContract({ address: pool, abi: LeveragePoolAbi, functionName: "previewMintStable", args: [amt] })) as readonly [bigint, bigint];
+      } catch (e) {
+        return push({ label: "Stable", tone: "bad", txs: [], text: `The pool won't mint sUSD right now: ${describeError(e)}` });
+      }
+      if (!(await approve(a.asset, pool, amt, "Approve NVDA"))) return;
+      const r = await send({ address: pool, abi: LeveragePoolAbi, functionName: "mintStable", args: [amt, minOf(out), deadline()], label: "Get sUSD" });
+      if (!ok(r)) return;
+      const c = toNum(amt, d.decimals.asset);
+      push({ label: "Stable", tone: "good", txs: [r.transactionHash], text: `Deposited ${fmtNum(c, 2)} NVDA (${usd(c * P)}) → ${fmtNum(toNum(out), 2)} sUSD.` });
     });
 
   const closeAll = () =>
@@ -189,20 +221,29 @@ export function SandboxView() {
       const at = r.price ? `NVDA ${usd(r.price)}` : "NVDA moved";
       const z = r.zone;
       if (!z) return push({ label, tone: bps > 0 ? "good" : "bad", txs, text: `${at} (${signed(bps / 10000, pct)} from live).` });
-      const lev = z.levBefore !== undefined && z.levAfter !== undefined ? ` Leverage ${fmtLev(z.levBefore)} → ${fmtLev(z.levAfter)}.` : "";
+      const lev = z.levBefore !== undefined && z.levAfter !== undefined ? ` Leverage ${big(z.levBefore)} → ${big(z.levAfter)}.` : "";
       const text =
         z.kind === "sell"
           ? z.toStakers && z.sold !== undefined && z.out !== undefined
-            ? `${at}. Leverage went above the band, so the pool sold ${fmtNum(z.sold, 4)} tNVDA to the sUSD owners by itself, for ${fmtNum(z.out, 2)} of their sUSD (at a discount).${lev}`
+            ? `${at}. Leverage went above the band, so the pool sold ${fmtNum(z.sold, 4)} NVDA to the sUSD owners by itself, for ${fmtNum(z.out, 2)} of their sUSD (at a discount).${lev}`
             : `${at}. Leverage went above the band, so the pool sold NVDA for dollars by itself.${lev}`
           : `${at}. Leverage went below the band, so the pool bought NVDA back by itself.${lev}`;
-      push({ label, tone: "warn", txs, text });
+      const many = (r.priceSteps ?? 1) > 1 ? ` The price moved in ${r.priceSteps} steps, and the pool rebalanced ${r.rebalances ?? 0} times on the way.` : "";
+      push({ label, tone: "warn", txs, text: text + many });
+    });
+
+  // Opens a new sandbox pool at the live price, at about 2x. The old pool stays on the chain, unused.
+  const resetPool = () =>
+    run("reset", async () => {
+      const r = await api({ action: "reset" });
+      push(r.ok ? { label: "New pool", tone: "good", txs: r.txs ?? [], text: "A new pool is open at the live price, at about 2x." } : { label: "New pool", tone: "bad", txs: r.txs ?? [], text: r.error ?? "The new pool was not opened." });
+      refresh();
     });
 
   const backToLive = () =>
     run("live", async () => {
       const r = await api({ action: "live" });
-      push(r.ok ? { label: "Live price", tone: "muted", txs: r.txs ?? [], text: "Price back to the live Atlas NVDA price." } : { label: "Live price", tone: "bad", txs: r.txs ?? [], text: r.error ?? "Reset failed." });
+      push(r.ok ? { label: "Live price", tone: "muted", txs: r.txs ?? [], text: r.steps?.some((x) => x.startsWith("minted")) ? "Price back to the live Atlas NVDA price. Leverage was below the range, so new stable deposits came in and brought it back to about 2x." : "Price back to the live Atlas NVDA price." } : { label: "Live price", tone: "bad", txs: r.txs ?? [], text: r.error ?? "Reset failed." });
     });
 
   // ------------------------------------------------------------- render
@@ -240,11 +281,13 @@ export function SandboxView() {
     );
   }
 
-  const needsPrep = !!s && !!sp && (s.leverage < 1.8 || (sp.deposit === 0 && sp.assetGain === 0)) && s.X > 0 && posX === 0 && Math.abs(vsLive) < 0.01;
+  const needsPrep = !!s && !!sp && s.leverage < 1.8 && s.X > 0 && posX === 0 && Math.abs(vsLive) < 0.01;
   const moves = [
+    { k: "+50%", bps: 5000, tone: "text-good" },
     { k: "+10%", bps: 1000, tone: "text-good" },
     { k: "−10%", bps: -1000, tone: "text-bad" },
     { k: "−20%", bps: -2000, tone: "text-bad" },
+    { k: "−50%", bps: -5000, tone: "text-bad" },
   ];
 
   return (
@@ -265,30 +308,76 @@ export function SandboxView() {
           <span className="text-2xs text-faint">Move NVDA:</span>
           {moves.map((m) => (
             <button key={m.k} className={`btn btn-sm num font-semibold ${m.tone}`} disabled={disabled} onClick={() => setPrice(m.bps, m.k)}>
-              {busy === m.k ? "…" : m.k}
+              {busy === m.k ? (Math.abs(m.bps) > 2000 ? "Moving…" : "…") : m.k}
             </button>
           ))}
           <button className="btn btn-sm" disabled={disabled} onClick={backToLive}>
             {busy === "live" ? "…" : "Live price"}
           </button>
+          <button className="btn btn-sm" disabled={disabled} onClick={resetPool} title="Open a new pool at the live price">
+            {busy === "reset" ? "Opening…" : "New pool"}
+          </button>
+          {(busy === "+50%" || busy === "−50%") && (
+            <span className="basis-full text-right text-2xs text-warn">The price moves in 3 steps, and the pool rebalances after each step. This takes 1 to 2 minutes. The buttons are locked until it ends.</span>
+          )}
         </div>
       </section>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
+          <div className="h-[380px] overflow-hidden rounded-card border border-line bg-surface">
+            <CandleChart id="nvda-flap" symbol="NVDA" leverSymbol="xNVDA" livePrice={s?.price} liveLabel="Sandbox" nav={s?.xNav} leverage={s?.leverage} interval={interval} onInterval={setIntervalSel} />
+          </div>
+          {/* pool now: four numbers that add up. Vault = stable side + leveraged side. Leverage = vault / leveraged side. */}
+          {s &&
+            (() => {
+              const vS = Math.min(s.S, s.V);
+              const vE = Math.max(0, s.V - vS);
+              // The contract's leverage: stock value divided by the leveraged side. Vault money is not in it.
+              const stock = s.C * s.price;
+              const lev = vE > 0 ? stock / vE : Infinity;
+              return (
+                <Panel
+                  title="Pool now"
+                  right={
+                    <span className="flex items-center gap-3">
+                      {sb.owner && <Addr a={sb.owner} />}
+                      <ModePill mode={s.mode} />
+                    </span>
+                  }
+                >
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+                    <Big k="Pool total value" v={usd(s.V)} sub="NVDA + vault money" />
+                    <Big k="NVDA inside" v={`${fmtNum(s.C, 2)} NVDA`} sub={`${usd(s.C * s.price)} at ${usd(s.price)}`} />
+                    <Big k="Vault money" v={usd(s.U)} sub="dollars from NVDA sales" />
+                    <Big k="Stable" v={usd(vS)} sub={`${fmtNum(s.S, 2)} sUSD`} tone="text-stable" />
+                    <Big k="Leveraged" v={usd(vE)} sub={`${fmtNum(s.X, 2)} xNVDA`} tone="text-lever" />
+                    <Big k="Leverage" v={vE > 0.005 ? fmtLev(lev) : "none"} sub={vE > 0.005 ? `NVDA ${usd(stock)} ÷ ${usd(vE)}` : "leveraged side is $0"} tone={vE <= 0.005 || lev > s.triggerLev || lev < s.lowerTriggerLev ? "text-bad" : "text-lever"} />
+                  </div>
+                  <div className="mt-4 flex h-2.5 overflow-hidden rounded-sm bg-surface2">
+                    <div className="bg-stable" style={{ width: `${s.V > 0 ? (vS / s.V) * 100 : 0}%` }} />
+                    <div className="bg-lever" style={{ width: `${s.V > 0 ? (vE / s.V) * 100 : 0}%` }} />
+                  </div>
+                  <p className="num mt-2 text-xs text-muted">
+                    Pool {usd(s.V)} = stable {usd(vS)} + leveraged {usd(vE)}
+                    {value > 0 ? ` · your part of the leveraged side: ${usd(value)} (${pct(myShare)})` : ""}
+                  </p>
+                </Panel>
+              );
+            })()}
           {/* portfolio */}
-          <Panel title="Your portfolio" right={s ? <ModePill mode={s.mode} /> : null}>
+          <Panel title="Your portfolio">
             {hasPos ? (
               <>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <Big k="You deposited" v={usd(usdIn)} sub={`${fmtNum(cIn, 2)} tNVDA at ${usd(entry)}`} />
+                  <Big k="You deposited" v={usd(usdIn)} sub={`${fmtNum(cIn, 2)} NVDA at ${usd(entry)}`} />
                   <Big k="Worth now" v={usd(value)} sub={`${fmtNum(posX, 2)} xNVDA × ${fmtUsd(nav, { digits: 4 })}`} />
                   <Big k="Profit / loss" v={signed(pnl, usd)} sub={signed(pnlPct, pct)} tone={pnl > 0.005 ? "text-good" : pnl < -0.005 ? "text-bad" : "text-ink"} />
                   <Big k="If you just held NVDA" v={usd(hold)} sub={`${signed(holdPnl, usd)} (${signed(move, pct)})`} tone="text-muted" />
                 </div>
                 <p className="mt-4 rounded border border-line bg-surface2 px-3 py-2 text-[13px] text-ink">
                   {Math.abs(move) < 0.0005 ? (
-                    <>Your 2x position is open. Move NVDA with the buttons above.</>
+                    <>Your long position is open. Move NVDA with the buttons above.</>
                   ) : (
                     <>
                       NVDA moved <b className={move > 0 ? "text-good" : "text-bad"}>{signed(move, pct)}</b>, your position moved <b className={pnlPct > 0 ? "text-good" : "text-bad"}>{signed(pnlPct, pct)}</b> (≈ {fmtLev(Math.abs(move) > 0.001 ? Math.abs(pnlPct / move) : s?.leverage ?? 2)}). No liquidation, no margin call: you just own a bigger or smaller slice of the pool.
@@ -302,77 +391,67 @@ export function SandboxView() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted">{!address ? "Connect your wallet, then deposit tNVDA on the right to open a 2x position." : book.ready ? "No 2x position yet. Deposit tNVDA on the right to open one." : "Reading your position…"}</p>
-            )}
-            {s && (
-              <div className="mt-4 border-t border-line pt-3">
-                <div className="mb-1.5 text-2xs text-faint">Who owns the pool&apos;s {usd(s.V)}</div>
-                <div className="flex h-2.5 overflow-hidden rounded-sm bg-surface2">
-                  <div className="bg-stable" style={{ width: `${s.V > 0 ? Math.min(100, (s.S / s.V) * 100) : 0}%` }} />
-                  <div className="bg-lever" style={{ width: `${s.V > 0 ? Math.max(0, (value / s.V) * 100) : 0}%` }} />
-                  <div className="bg-lever/40" style={{ width: `${s.V > 0 ? Math.max(0, ((s.E - value) / s.V) * 100) : 0}%` }} />
-                </div>
-                <div className="num mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted">
-                  <span><span className="text-stable">■</span> sUSD owners {usd(Math.min(s.S, s.V))} (fixed dollars)</span>
-                  <span><span className="text-lever">■</span> You {usd(value)} ({pct(myShare)} of xNVDA)</span>
-                  <span>Other xNVDA (first-loss seed) {usd(Math.max(0, s.E - value))}</span>
-                </div>
-              </div>
+              <p className="text-sm text-muted">{!address ? "Connect your wallet, then deposit NVDA on the right to open a long position." : book.ready ? "No long position yet. Deposit NVDA on the right to open one." : "Reading your position…"}</p>
             )}
             {u && (
               <div className="num mt-3 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-faint">
-                <span>Wallet: {fmtNum(toNum(u.asset, d.decimals.asset), 2)} tNVDA</span>
+                <span>Wallet: {fmtNum(toNum(u.asset, d.decimals.asset), 2)} NVDA</span>
                 <span>{fmtNum(toNum(u.usdc, d.decimals.usdc), 2)} mUSDC</span>
+                {a?.asset && (
+                  <button
+                    type="button"
+                    className="link disabled:opacity-50"
+                    disabled={!!pending}
+                    onClick={async () => {
+                      const r = await send({ address: a.asset, abi: [{ type: "function", name: "faucet", stateMutability: "nonpayable", inputs: [], outputs: [{ type: "uint256" }] }], functionName: "faucet", args: [], label: "Get test NVDA" } as never);
+                      if (r) refresh();
+                    }}
+                  >
+                    Get 10 test NVDA
+                  </button>
+                )}
               </div>
             )}
           </Panel>
 
-          {/* stakers */}
-          <Panel title="sUSD owners (staked in the insurance pool)" right={sb.owner ? <Addr a={sb.owner} /> : null}>
-            {spS > 0 || spA > 0 ? (
-              <>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <Big k="Staked at start" v={`${fmtNum(stakedStart, 2)} sUSD`} sub={usd(stakedStart)} />
-                  <Big k="sUSD they still have" v={`${fmtNum(spS + spR, 2)} sUSD`} sub={`worth ${fmtUsd(sUSDPrice, { digits: 2 })} each`} tone="text-stable" />
-                  <Big k="NVDA they received" v={`${fmtNum(spA, 4)} tNVDA`} sub={usd(spA * P)} />
-                  <Big k="Total value" v={usd(stakersValue)} sub={stakedStart > 0 ? `${signed(stakersPnl, usd)} vs staked` : undefined} tone={stakersPnl >= -0.005 ? "text-good" : "text-bad"} />
-                </div>
-                <p className="mt-4 text-[13px] leading-relaxed text-muted">
-                  {spA > 0
-                    ? "When NVDA fell and leverage left the band, the pool sold NVDA to the sUSD owners at a small discount: their sUSD was swapped for tNVDA, so nobody was liquidated."
-                    : "Stakers hold sUSD, a dollar backed by the pool. If NVDA falls far enough, the pool sells them NVDA at a discount for part of their sUSD."}{" "}
-                  sUSD stays worth $1 while backing is above 100%.
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-muted">No sUSD staked yet.</p>
-            )}
-          </Panel>
 
           <Log rows={log} />
         </div>
 
         <div className="space-y-4">
-          <Panel title={<span className="text-lever">Long 2x</span>}>
+          <Panel title={side === "long" ? <span className="text-lever">Long</span> : <span className="text-stable">Stable</span>}>
+            <div className="mb-3 grid grid-cols-2 gap-1 rounded border border-line bg-surface2 p-1">
+              <button type="button" onClick={() => setSide("long")} className={`rounded px-2 py-1.5 text-xs font-semibold ${side === "long" ? "bg-surface text-lever shadow-sm" : "text-muted hover:text-ink"}`}>
+                Long {levNow}
+              </button>
+              <button type="button" onClick={() => setSide("stable")} className={`rounded px-2 py-1.5 text-xs font-semibold ${side === "stable" ? "bg-surface text-stable shadow-sm" : "text-muted hover:text-ink"}`}>
+                Stable
+              </button>
+            </div>
             <label className="text-2xs text-faint" htmlFor="sb-amt">
-              Deposit tNVDA
+              Deposit NVDA
             </label>
             <div className="mt-1 flex items-center gap-2">
               <input id="sb-amt" className="input num w-full" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} />
-              <span className="text-xs text-muted">tNVDA</span>
+              <span className="text-xs text-muted">NVDA</span>
             </div>
-            <div className="num mt-1 text-2xs text-faint">≈ {usd((Number(amount) || 0) * P)} · fee {s ? fmtPct(s.leverMintFeeBps / 10000, 2) : "–"}</div>
-            <button className="btn-primary mt-3 w-full" disabled={disabled || !s || Math.abs(vsLive) > 0.01} onClick={goLong}>
-              {busy === "long" ? "Opening…" : "Long 2x"}
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="num text-xl font-semibold text-ink">≈ {usd((Number(amount) || 0) * P)}</span>
+              <span className="num text-2xs text-faint">fee {s ? fmtPct((side === "long" ? s.leverMintFeeBps : s.stableMintFeeBps) / 10000, 2) : "–"}</span>
+            </div>
+            <button className="btn-primary mt-3 w-full" disabled={disabled || !s || Math.abs(vsLive) > 0.01} onClick={side === "long" ? goLong : goStable}>
+              {side === "long" ? (busy === "long" ? "Opening…" : `Long ${levNow}`) : busy === "stable" ? "Minting…" : "Get sUSD"}
             </button>
             {Math.abs(vsLive) > 0.01 && <p className="mt-2 text-2xs text-warn">Open positions at the live price: new positions are blocked while the price is far from CoinMarketCap.</p>}
-            <p className="mt-3 text-2xs leading-relaxed text-muted">You get xNVDA, which moves about 2x with NVDA. Nobody lends to you, so it is never liquidated.</p>
+            <p className="mt-3 text-2xs leading-relaxed text-muted">
+              {side === "long" ? `You get xNVDA, which moves about ${levNow} with NVDA now. Nobody lends to you, so it is never liquidated.` : "You get sUSD, a dollar backed by the pool. It does not move with NVDA. Stake it to earn the funding fee."}
+            </p>
           </Panel>
 
           {needsPrep && (
             <Panel title="Set up (before the demo)">
               <button className="btn w-full" disabled={disabled} onClick={setup}>
-                {busy === "setup" ? "Setting up…" : `Set leverage to 2x and stake the sUSD (now ${s ? fmtLev(s.leverage) : "…"})`}
+                {busy === "setup" ? "Setting up…" : `Set leverage to 2x (now ${s ? fmtLev(s.leverage) : "…"})`}
               </button>
             </Panel>
           )}
