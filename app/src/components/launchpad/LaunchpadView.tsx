@@ -34,7 +34,7 @@ export function LaunchpadView() {
   const tsla = rows.find((r) => r.meta.source === "four" && r.meta.symbol === "TSLA");
   const tslaPending = pending.some((p) => p.symbol === "TSLA");
   // Display-only example of a market that is listed on all three places (no launch exists for it on-chain).
-  const aapl = rows.find((r) => r.meta.symbol === "AAPL");
+  const msft = rows.find((r) => r.meta.symbol === "MSFT");
   // Until the Four.meme launch graduates, "Trade TSLA" opens the TSLA market from the list (demo pool state).
   const tslaAny = tsla ?? rows.find((r) => r.meta.symbol === "TSLA");
 
@@ -82,9 +82,9 @@ export function LaunchpadView() {
   // The Four.meme launch panel opens as a pop-up from the TSLA market card.
   const [showFour, setShowFour] = useState(false);
   const fourRef = useRef<HTMLDivElement>(null);
-  // Display-only example of an AAPL launch on Four.meme (opens from the AAPL card).
-  const [showAapl, setShowAapl] = useState(false);
-  const aaplRef = useRef<HTMLDivElement>(null);
+  // Display-only example of an MSFT launch on Four.meme (opens from the MSFT card).
+  const [showMsft, setShowMsft] = useState(false);
+  const msftRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const open = () => setShowFour(true);
     window.addEventListener("more:show-four", open);
@@ -205,16 +205,16 @@ export function LaunchpadView() {
         )}
         <div className="bg-surface p-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] font-semibold text-ink">AAPL market</span>
+            <span className="text-[13px] font-semibold text-ink">MSFT market</span>
             <span className="flex items-center gap-1.5">
               <MoreBadge />
               <SourceBadge label="Flap" iconOnly />
               <SourceBadge label="Four.meme" iconOnly />
             </span>
           </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted">One market on all three: listed on MORE, with a launch on Flap and a launch on Four.meme. Both launches fund the same pool&apos;s first-loss xAAPL and its insurance vault.</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted">One market on all three: listed on MORE, with a launch on Flap and a launch on Four.meme. Both launches fund the same pool&apos;s first-loss xMSFT and its insurance vault.</p>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="num text-xs text-muted">{aapl?.snap ? `${fmtUsd(aapl.snap.price, { digits: 2 })} · ${fmtLev(aapl.snap.leverage)} · TVL ${fmtUsd(aapl.snap.V, { compact: true })}` : "2.00x · example"}</span>
+            <span className="num text-xs text-muted">{msft?.snap ? `${fmtUsd(msft.snap.price, { digits: 2 })} · ${fmtLev(msft.snap.leverage)} · TVL ${fmtUsd(msft.snap.V, { compact: true })}` : "2.00x · example"}</span>
             <span className="flex flex-wrap items-center justify-end gap-2 whitespace-nowrap">
               <a href={FLAP_NVDA_URL.replace(/0x[0-9a-f]{40}$/i, "")} target="_blank" rel="noreferrer" className="btn btn-sm">
                 View on Flap
@@ -225,25 +225,25 @@ export function LaunchpadView() {
               <button
                 type="button"
                 className="btn btn-sm"
-                aria-expanded={showAapl}
+                aria-expanded={showMsft}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowAapl((v) => !v);
+                  setShowMsft((v) => !v);
                 }}
               >
-                Modify {showAapl ? "▴" : "▾"}
+                Modify {showMsft ? "▴" : "▾"}
               </button>
-              {aapl && (
-                <Link href={`/trade/${aapl.meta.id}`} className="btn-primary btn-sm">
-                  Trade AAPL
+              {msft && (
+                <Link href={`/trade/${msft.meta.id}`} className="btn-primary btn-sm">
+                  Trade MSFT
                 </Link>
               )}
             </span>
           </div>
         </div>
         <div className="hidden bg-surface md:block" aria-hidden />
-        {showAapl && (
-          <div ref={aaplRef} className="bg-surface p-4 md:col-span-2">
+        {showMsft && (
+          <div ref={msftRef} className="bg-surface p-4 md:col-span-2">
             <ExampleFourLaunch />
           </div>
         )}
@@ -252,12 +252,12 @@ export function LaunchpadView() {
   );
 }
 
-/** Display-only example: an AAPL Market launch on Four.meme. No contract is behind it. */
+/** Display-only example: an MSFT Market launch on Four.meme. No contract is behind it. */
 function ExampleFourLaunch() {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const checks: [boolean, string][] = [
     [false, "Sold out, soft cap or expiry reached"],
-    [true, "AAPL price fresh (Atlas)"],
+    [true, "MSFT price fresh (Atlas)"],
     [true, "Pool minting not paused"],
     [true, "CMC price check passes"],
     [true, "Launch may open a pool"],
@@ -272,33 +272,33 @@ function ExampleFourLaunch() {
           <div className="bg-surface2 px-3 py-3">
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-[13px] font-medium text-ink">
-                AAPL Market <span className="num text-xs font-normal text-muted">$AAPLM</span>
+                MSFT Market <span className="num text-xs font-normal text-muted">$MSFTM</span>
               </span>
               <span className="text-2xs text-muted">Trading</span>
             </div>
             <div className="mt-2 h-1 overflow-hidden rounded-sm bg-surface">
               <div className="h-full bg-accent" style={{ width: "60%" }} />
             </div>
-            <div className="num mt-1 text-2xs text-faint">2.4 / 4 tAAPL · 60%</div>
+            <div className="num mt-1 text-2xs text-faint">2.4 / 4 tMSFT · 60%</div>
           </div>
         </div>
         <div className="grid overflow-hidden rounded-card border border-line bg-surface md:grid-cols-2">
           <div className="p-4">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-base font-semibold text-ink">
-                AAPL Market <span className="num text-sm font-normal text-muted">$AAPLM</span>
+                MSFT Market <span className="num text-sm font-normal text-muted">$MSFTM</span>
               </span>
-              <span className="num text-xs text-faint">0xA9c1…4f77</span>
+              <span className="num text-xs text-faint">0x5E2b…9a31</span>
             </div>
-            <div className="mt-1 text-xs text-muted">Trading · raised in tAAPL</div>
+            <div className="mt-1 text-xs text-muted">Trading · raised in tMSFT</div>
             <div className="mt-3 flex items-baseline justify-between text-xs">
               <span className="text-muted">Raise</span>
-              <span className="num text-ink">2.4 / 4 tAAPL · 60.0%</span>
+              <span className="num text-ink">2.4 / 4 tMSFT · 60.0%</span>
             </div>
             <div className="mt-1.5 h-1 overflow-hidden rounded-sm bg-surface2">
               <div className="h-full bg-accent" style={{ width: "60%" }} />
             </div>
-            <div className="num mt-1 text-2xs text-faint">320,000 AAPLM left for sale</div>
+            <div className="num mt-1 text-2xs text-faint">320,000 MSFTM left for sale</div>
             <div className="mt-3 grid grid-cols-2 gap-1 rounded border border-line bg-surface2 p-1 text-xs">
               {(["buy", "sell"] as const).map((k) => (
                 <button key={k} type="button" onClick={() => setSide(k)} className={`rounded py-1.5 ${side === k ? "bg-surface font-medium text-ink" : "text-muted"}`}>
@@ -307,17 +307,17 @@ function ExampleFourLaunch() {
               ))}
             </div>
             <div className="mt-3 flex items-baseline justify-between text-xs text-muted">
-              <span>Amount (AAPLM)</span>
-              <span className="num">0 AAPLM · 0 tAAPL</span>
+              <span>Amount (MSFTM)</span>
+              <span className="num">0 MSFTM · 0 tMSFT</span>
             </div>
-            <input className="input mt-1.5" inputMode="decimal" placeholder="0" aria-label="Amount of AAPLM" />
+            <input className="input mt-1.5" inputMode="decimal" placeholder="0" aria-label="Amount of MSFTM" />
             <button type="button" className="btn-primary mt-4 w-full">
-              {side === "buy" ? "Buy AAPLM" : "Sell AAPLM"}
+              {side === "buy" ? "Buy MSFTM" : "Sell MSFTM"}
             </button>
-            <div className="mt-2 text-2xs text-faint">You need test tAAPL to buy.</div>
+            <div className="mt-2 text-2xs text-faint">You need test tMSFT to buy.</div>
           </div>
           <div className="border-t border-line p-4 md:border-l md:border-t-0">
-            <div className="text-[13px] font-semibold text-ink">Graduation → AAPL market</div>
+            <div className="text-[13px] font-semibold text-ink">Graduation → MSFT market</div>
             <ul className="mt-2 space-y-1 text-xs">
               {checks.map(([ok, text]) => (
                 <li key={text} className="flex items-center gap-2 text-muted">
@@ -327,7 +327,7 @@ function ExampleFourLaunch() {
               ))}
             </ul>
             <div className="mt-3 rounded border border-line px-3 py-2 text-xs text-muted">
-              On graduation: <span className="num text-ink">2 tAAPL</span> seeds the pool&apos;s first-loss xAAPL and <span className="num text-ink">2 tAAPL</span> mints sUSD to pair with the launch token.
+              On graduation: <span className="num text-ink">2 tMSFT</span> seeds the pool&apos;s first-loss xMSFT and <span className="num text-ink">2 tMSFT</span> mints sUSD to pair with the launch token.
             </div>
             <div className="mt-3 text-xs text-warn">Launch conditions not met</div>
             <button type="button" className="btn-primary mt-2 w-full opacity-60" disabled>
