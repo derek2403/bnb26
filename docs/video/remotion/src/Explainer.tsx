@@ -2818,6 +2818,40 @@ const TableRebound: React.FC<{ dur: number }> = ({ dur }) => (
   </Scene>
 );
 
+
+const LOGO: Record<string, string> = {
+  Atlas: "partners/atlas.svg",
+  CoinMarketCap: "partners/coinmarketcap.png",
+  Flap: "partners/flap.png",
+  "Four.meme": "partners/fourmeme.png",
+};
+
+const Powered: React.FC<{ label: string; items: string[] }> = ({ label, items }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
+    <span style={{ fontSize: 38, fontWeight: 800, color: C.ink }}>{label}</span>
+    {items.map((t) => (
+      <span
+        key={t}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 14,
+          background: "#fff",
+          border: `4px solid ${C.ink}`,
+          borderRadius: 50,
+          padding: "8px 28px 8px 12px",
+          fontSize: 38,
+          fontWeight: 900,
+          boxShadow: `5px 5px 0 ${C.ink}`,
+        }}
+      >
+        <Img src={staticFile(LOGO[t])} style={{ width: 54, height: 54, objectFit: "contain", borderRadius: 12 }} />
+        {t}
+      </span>
+    ))}
+  </div>
+);
+
 const Algo: React.FC<{ dur: number }> = ({ dur }) => (
   <Scene dur={dur}>
     <AbsoluteFill
@@ -2830,7 +2864,7 @@ const Algo: React.FC<{ dur: number }> = ({ dur }) => (
       }}
     >
       <Show at={4}>
-        <div style={{ fontSize: 92, fontWeight: 900, letterSpacing: -1 }}>
+        <div style={{ fontSize: 80, fontWeight: 900, letterSpacing: -1, whiteSpace: "nowrap" }}>
           An algorithm does the buying and selling.
         </div>
       </Show>
@@ -3219,9 +3253,9 @@ const Trip: React.FC<{ dur: number }> = ({ dur }) => {
 
 const Markets2: React.FC<{ dur: number }> = ({ dur }) => {
   const cards = [
-    { at: 40, stock: "bNVDA", color: C.green, rows: ["1.6× to 2.67×", "4%", "$10,000", "20%", "10%"] },
-    { at: 80, stock: "bTSLA", color: C.orange, rows: ["1.5× to 2.3×", "6%", "$25,000", "20%", "10%"] },
-    { at: 120, stock: "bAAPL", color: C.sky, rows: ["1.8× to 3.0×", "3%", "$5,000", "20%", "10%"] },
+    { at: 200, stock: "bNVDA", color: C.green, rows: ["1.6× to 2.67×", "4%", "$10,000", "20%", "10%"] },
+    { at: 225, stock: "bTSLA", color: C.orange, rows: ["1.5× to 2.3×", "6%", "$25,000", "20%", "10%"] },
+    { at: 250, stock: "bAAPL", color: C.sky, rows: ["1.8× to 3.0×", "3%", "$5,000", "20%", "10%"] },
   ];
   const keys = ["Leverage range", "Funding fee", "Vault seed", "Creator earns", "Platform earns"];
   return (
@@ -3233,9 +3267,12 @@ const Markets2: React.FC<{ dur: number }> = ({ dur }) => {
         footer="Then anyone can deposit and pick a side. Creator and platform earn a share of the mint and redeem fees."
         footAt={185}
       >
-        <Show at={12}>
+        <Show at={95}>
+          <Powered label="A launchpad on" items={["Flap", "Four.meme"]} />
+        </Show>
+        <Show at={165} style={{ marginTop: 24 }}>
           <Body size={38}>
-            Anyone can launch a market like this, with their own stock, leverage, fee and vault.
+            Anyone can launch a MORE market with their own config: stock, leverage, fee and vault.
           </Body>
         </Show>
         <div style={{ display: "flex", gap: 40, marginTop: 22 }}>
@@ -3289,6 +3326,100 @@ const Markets2: React.FC<{ dur: number }> = ({ dur }) => {
   );
 };
 
+// ---------- Eighth pass: the two closing scenes about the partners ----------
+const Partner: React.FC<{ name: string; color: string; children: React.ReactNode }> = ({
+  name,
+  color,
+  children,
+}) => (
+  <div
+    style={{
+      flex: 1,
+      border: `4px solid ${C.ink}`,
+      borderRadius: 18,
+      boxShadow: `8px 8px 0 ${C.ink}`,
+      background: "#fff",
+      overflow: "hidden",
+    }}
+  >
+    <div
+      style={{
+        background: color,
+        borderBottom: `4px solid ${C.ink}`,
+        padding: "12px 28px",
+        fontSize: 50,
+        fontWeight: 900,
+      }}
+    >
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 18 }}>
+        <Img
+          src={staticFile(LOGO[name])}
+          style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 14, background: "#fff", padding: 6 }}
+        />
+        {name}
+      </span>
+    </div>
+    <div style={{ padding: "16px 28px 20px" }}>{children}</div>
+  </div>
+);
+
+const Row: React.FC<{ k: string; v: string; at?: number }> = ({ k, v, at = 0 }) => (
+  <Show at={at} dist={12}>
+    <div style={{ fontSize: 34, lineHeight: 1.5, marginBottom: 8 }}>
+      <span style={{ fontWeight: 900 }}>{k}</span>
+      <span style={{ fontWeight: 500 }}> {v}</span>
+    </div>
+  </Show>
+);
+
+const DataPartners: React.FC<{ dur: number }> = ({ dur }) => (
+  <Scene dur={dur}>
+    <Frame title="Price and data: Atlas, CoinMarketCap.">
+      <div style={{ display: "flex", gap: 44 }}>
+        <Show at={58} style={{ flex: 1, display: "flex" }}>
+          <Partner name="Atlas" color={C.green}>
+            <Row at={128} k="Live stock price." v="Every mint, redeem, sale and buy uses it." />
+            <Row at={150} k="It gives the leverage:" v="stock value ÷ leveraged side." />
+          </Partner>
+        </Show>
+        <Show at={82} style={{ flex: 1, display: "flex" }}>
+          <Partner name="CoinMarketCap" color={C.sky}>
+            <Row at={196} k="Volatility" v="sets how early the pool sells." />
+            <Row at={236} k="Liquidity" v="sets how much it sells in one trade." />
+            <Row at={356} k="Price check:" v="mints stop if it differs from Atlas." />
+          </Partner>
+        </Show>
+      </div>
+    </Frame>
+  </Scene>
+);
+
+const LaunchPartners: React.FC<{ dur: number }> = ({ dur }) => (
+  <Scene dur={dur}>
+    <Frame title="Launch a token on Flap or Four.meme.">
+      <div style={{ display: "flex", gap: 44 }}>
+        <Show at={16} style={{ flex: 1, display: "flex" }}>
+          <Partner name="Flap" color={C.orange}>
+            <Row k="Create your own token." v="Configure the launch on Flap." />
+            <Row k="The raise opens a market." v="Example: NVDA." />
+          </Partner>
+        </Show>
+        <Show at={44} style={{ flex: 1, display: "flex" }}>
+          <Partner name="Four.meme" color={C.gold}>
+            <Row k="Create your own token." v="Configure the launch on OpenFour." />
+            <Row k="Selling out opens a market." v="Example: TSLA." />
+          </Partner>
+        </Show>
+      </div>
+      <Show at={78} style={{ marginTop: 44 }}>
+        <Body size={42} bold>
+          On both, a user configures and launches a token. The launch opens a market.
+        </Body>
+      </Show>
+    </Frame>
+  </Scene>
+);
+
 // ---------- Timeline ----------
 type Item = { dur: number; el: (dur: number) => React.ReactNode };
 const TIMELINE: Item[] = [
@@ -3326,6 +3457,7 @@ const TIMELINE: Item[] = [
   { dur: 140, el: (d) => <WhyBob2 dur={d} /> },
   { dur: 165, el: (d) => <Rates dur={d} /> },
   { dur: 240, el: (d) => <Markets2 dur={d} /> },
+  { dur: 195, el: (d) => <DataPartners dur={d} /> },
   { dur: 130, el: (d) => <Title dur={d} end /> },
 ];
 
@@ -3359,7 +3491,8 @@ const VOICE: [number, number, number, string?][] = [
   [145.31, 149.87, 137],
   [12.25, 16.51, 132, "voice/extra.mp3"],
   [154.97, 158.67, 111],
-  [0.02, 14.57, 436, "voice/markets.mp3"],
+  [0.00, 14.71, 441, "voice/end2.mp3"],
+  [14.71, 29.57, 455, "voice/end2.mp3"],
   [166.38, 170.76, 146],
 ];
 
@@ -3383,11 +3516,13 @@ export const More: React.FC = () => (
     <Series>
       {TIMELINE.map((t, i) => (
         <Series.Sequence key={i} durationInFrames={VOICE[i][2]}>
-          <Audio
-            src={staticFile(VOICE[i][3] ?? "voice/full.mp3")}
-            startFrom={Math.round(VOICE[i][0] * 30)}
-            endAt={Math.round(VOICE[i][1] * 30)}
-          />
+          {VOICE[i][1] > VOICE[i][0] ? (
+            <Audio
+              src={staticFile(VOICE[i][3] ?? "voice/full.mp3")}
+              startFrom={Math.round(VOICE[i][0] * 30)}
+              endAt={Math.round(VOICE[i][1] * 30)}
+            />
+          ) : null}
           <Fit design={t.dur} actual={VOICE[i][2]} el={t.el} />
         </Series.Sequence>
       ))}
