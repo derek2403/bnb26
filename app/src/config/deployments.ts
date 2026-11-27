@@ -52,6 +52,8 @@ export type Deployments = {
       | "marketCalendar"
       | "logAnchor"
       | "sandboxFactory"
+      | "sandboxFactoryAAPL"
+      | "sandboxFactoryTSLA"
       | "creatorRegistrar"
       | "timelock"
       | "guardian",

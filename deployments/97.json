@@ -6,7 +6,8 @@
     "tNVDA": "0x5Df0DC395E7686bcDc41f75891f1Ab982476fddd",
     "tTSLA": "0x9A75c8fFf0ce5Ed6B9F0fc28ad57D0DAC34B05F6",
     "mUSDC": "0x49c67aEf9Ad0bDAF3e96103059E0f931e5a9677D",
-    "WBNB": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
+    "WBNB": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+    "tAAPL": "0x246f41c6cE8a6d22aec804A87B4eFf9a934D528e"
   },
   "core": {
     "poolFactory": "0xF4Ef260a4605A2bfE7B0fF3113065D3FCD6EDBb9",
@@ -24,7 +25,9 @@
     "scenarioFeedImpl": "0x964F456566F97daCCC16bB58a2b4258414AB8D5b",
     "poolImplLegacy": "0xcf70F6864DBB05D829E62A637018F7ec84C747d4",
     "poolLogicLegacy": "0x44BCE3FCAE26CabeE16D639240D1dA89376DcA18",
-    "stabilityPoolImplLegacy": "0x5eCC5Cb2dDa45c89FCFE318cD56b259E7C123aC3"
+    "stabilityPoolImplLegacy": "0x5eCC5Cb2dDa45c89FCFE318cD56b259E7C123aC3",
+    "sandboxFactoryAAPL": "0x318dd7AF2c877bd5276e9874C68D419fD84b5f4c",
+    "sandboxFactoryTSLA": "0xabDE733C23b2915aB1530aA0163a955a6EA15C4A"
   },
   "oracles": {
     "NVDA": {
