@@ -13,6 +13,7 @@ import { STOCK_NAMES } from "@/config/demoPools";
 import { FLAP, useFlapFactoryInfo, useFlapLaunch, useMyLaunches, type LaunchStep, type MyLaunch } from "@/hooks/useFlapLaunch";
 import { LAUNCH_BOUNDS, byteLen, flapLauncherUrl } from "@/lib/flapLaunch";
 import { fmtNum, short } from "@/lib/format";
+import { saveMyMarket } from "@/lib/myMarkets";
 import { TickerIcon } from "../ui";
 
 const STOCKS = ["NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AVGO", "NFLX", "COIN", "MSTR", "AMD"] as const;
@@ -26,11 +27,11 @@ const VENUES: { id: Venue; name: string; logo?: string; note: string }[] = [
   { id: "four", name: "Four.meme", logo: "/partners/fourmeme.png", note: "Token launch on OpenFour" },
 ];
 // MORE only: SandboxFactory.create() opens a pool on MORE's own PoolFactory from the user's wallet.
-// Each stock has its own factory. One wallet can open one market for each stock.
+// Each stock has its own factory (MarketFactory). One wallet can open many markets.
 const DIRECT: Record<string, Address | undefined> = {
-  NVDA: addr(deployments97.core.sandboxFactory),
-  AAPL: addr(deployments97.core.sandboxFactoryAAPL),
-  TSLA: addr(deployments97.core.sandboxFactoryTSLA),
+  NVDA: addr(deployments97.core.marketFactoryNVDA),
+  AAPL: addr(deployments97.core.marketFactoryAAPL),
+  TSLA: addr(deployments97.core.marketFactoryTSLA),
 };
 const tradeHref = (stock: string) => (stock === "NVDA" ? "/trade/sandbox" : `/trade/${stock.toLowerCase()}`);
 type StepState = "wait" | "run" | "done" | "skip" | "error";
@@ -98,7 +99,11 @@ export function LaunchMarketForm() {
     query: { enabled: !!DIRECT_FACTORY && !!me, refetchInterval: 15_000 },
   });
   const myPool = (mine.data as { pool?: Address } | undefined)?.pool;
-  const hasDirect = !!myPool && myPool !== zeroAddress;
+  // Each press of the launch button is one entry under "My markets".
+  const runId = useRef("");
+  const [morePool, setMorePool] = useState<Address | null>(null);
+  const [moreTx, setMoreTx] = useState<Hex | null>(null);
+  const [fourTx, setFourTx] = useState<Hex | null>(null);
   const [direct, setDirect] = useState<{ ok: boolean; text: string } | null>(null);
   // Progress pop-up: which launches this press started, and the state of the MORE and Four.meme ones.
   const [run, setRun] = useState<{ more: boolean; flap: boolean; four: boolean } | null>(null);
@@ -124,8 +129,15 @@ export function LaunchMarketForm() {
     }
     const r = await tx.send({ address: DIRECT_FACTORY, abi: SandboxFactoryAbi, functionName: "create", args: [], label: "Open the market on MORE" } as never);
     setDirectBusy(false);
-    void mine.refetch();
     const ok = !!r && (r as { status?: string }).status === "success";
+    if (ok) {
+      setMoreTx((r as { transactionHash?: Hex }).transactionHash ?? null);
+      // The factory keeps the newest market of the wallet.
+      const fresh = (await mine.refetch()).data as { pool?: Address } | undefined;
+      const p = fresh?.pool && fresh.pool !== zeroAddress ? fresh.pool : (myPool ?? null);
+      setMorePool(p);
+      if (p) saveMyMarket(runId.current, stock, { more: p });
+    }
     setMoreState(ok ? "done" : "error");
     setDirect(ok ? { ok: true, text: "Market opened on MORE, directly on our pool factory." } : { ok: false, text: "The market was not opened on MORE." });
     return ok;
@@ -142,8 +154,10 @@ export function LaunchMarketForm() {
     setFourState("run");
     try {
       const res = await fetch("/api/launch/create-four", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[]; name?: string; pool?: Address | null; token?: Address };
+      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[]; name?: string; pool?: Address | null; token?: Address; txs?: Hex[] };
+      setFourTx(j.ok ? (j.txs?.[j.txs.length - 1] ?? null) : null);
       setFourPool(j.ok ? (j.pool ?? null) : null);
+      if (j.ok && j.pool) saveMyMarket(runId.current, "TSLA", { four: j.pool, fourName: j.name });
       setFour(j.ok ? { ok: true, text: `${j.name ?? "The launch"} was created, sold out and graduated. Its TSLA market is open.` } : { ok: false, text: `${j.steps?.length ? `Done: ${j.steps.join("; ")}. Then: ` : ""}${j.error ?? "The launch failed."}` });
       setFourState(j.ok ? "done" : "error");
     } catch {
@@ -212,14 +226,19 @@ export function LaunchMarketForm() {
       return;
     }
     setRun({ more: wantMore, flap: wantFlap && !problem, four: wantFour });
-    setMoreState(wantMore && hasDirect ? "skip" : "wait");
+    runId.current = `${Date.now()}`;
+    setMorePool(null);
+    setMoreTx(null);
+    setFourTx(null);
+    setFourPool(null);
+    setMoreState("wait");
     setFourState("wait");
     setFour(null);
     setDirect(null);
     // Four.meme needs no wallet: the server key signs it, so it runs beside the wallet steps.
     if (wantFour) void launchFour();
     // 1. MORE: straight to our own contract.
-    if (wantMore && !hasDirect) {
+    if (wantMore) {
       const ok = await openDirect();
       if (!ok) return;
     }
@@ -229,7 +248,7 @@ export function LaunchMarketForm() {
   const flapProblem = wantFlap ? problem : null;
   const directProblem = wantMore && !DIRECT_FACTORY ? "A direct market on MORE supports NVDA, TSLA and AAPL on testnet." : null;
   const fourProblem = wantFour && stock !== "TSLA" ? "Four.meme launches support TSLA on testnet." : null;
-  const nothingToDo = !wantFlap && !wantFour && (!wantMore || hasDirect);
+  const nothingToDo = !wantFlap && !wantFour && !wantMore;
   const blocked = !!directProblem || !!flapProblem || !!fourProblem || nothingToDo;
 
   return (
@@ -488,18 +507,6 @@ export function LaunchMarketForm() {
           {directProblem && <p className="mt-2 text-xs text-warn">{directProblem}</p>}
           {flapProblem && <p className="mt-2 text-xs text-warn">{flapProblem}</p>}
           {fourProblem && <p className="mt-2 text-xs text-warn">{fourProblem}</p>}
-          {wantMore && hasDirect && (
-            <p className="mt-2 text-xs text-muted">
-              This wallet already has a {stock} market on MORE:{" "}
-              <a className="num link" href={addressUrl(myPool!)} target="_blank" rel="noreferrer">
-                {short(myPool!, 6)}
-              </a>
-              .{" "}
-              <Link href={tradeHref(stock)} className="link">
-                Trade it
-              </Link>
-            </p>
-          )}
           {!blocked && !flow.isConnected && flow.step === "idle" && <p className="mt-2 text-xs text-muted">You will be asked to connect a wallet first.</p>}
           {flow.step !== "idle" && flow.step !== "error" && (
             <p className={`mt-2 text-xs ${flow.step === "done" ? "text-good" : "text-muted"}`}>
@@ -527,7 +534,9 @@ export function LaunchMarketForm() {
           }}
           four={{ state: fourState, text: fourState === "run" ? "Creating the launch, funding it and graduating it (about a minute)…" : four?.text }}
           fourPool={fourPool ?? undefined}
-          pool={hasDirect ? myPool : undefined}
+          moreTx={moreTx ?? undefined}
+          fourTx={fourTx ?? undefined}
+          pool={morePool ?? undefined}
           onClose={() => setRun(null)}
         />
       )}
@@ -769,6 +778,8 @@ function LaunchProgress({
   four,
   pool,
   fourPool,
+  moreTx,
+  fourTx,
   onClose,
 }: {
   run: { more: boolean; flap: boolean; four: boolean };
@@ -778,13 +789,15 @@ function LaunchProgress({
   four: { state: StepState; text?: string };
   pool?: Address;
   fourPool?: Address;
+  moreTx?: Hex;
+  fourTx?: Hex;
   onClose: () => void;
 }) {
   const rows = [
-    run.more && { key: "more", logo: "/logos/more.png", wide: true, title: `Open the ${stock} market on MORE`, ...more },
+    run.more && { key: "more", logo: "/logos/more.png", wide: true, title: `Open the ${stock} market on MORE`, tx: moreTx, ...more },
     run.flap && { key: "flap", logo: "/partners/flap.png", wide: false, title: `Launch the ${stock} market on Flap`, ...flap },
-    run.four && { key: "four", logo: "/partners/fourmeme.png", wide: false, title: "Launch the TSLA market on Four.meme", ...four },
-  ].filter(Boolean) as { key: string; logo: string; wide: boolean; title: string; state: StepState; text?: string }[];
+    run.four && { key: "four", logo: "/partners/fourmeme.png", wide: false, title: "Launch the TSLA market on Four.meme", tx: fourTx, ...four },
+  ].filter(Boolean) as { key: string; logo: string; wide: boolean; title: string; state: StepState; text?: string; tx?: Hex }[];
   const busy = rows.some((r) => r.state === "run" || r.state === "wait");
   const failed = rows.some((r) => r.state === "error");
   const waitLabel: Record<StepState, string> = { wait: "Waiting", run: "In progress", done: "Done", skip: "Already open", error: "Failed" };
@@ -812,21 +825,16 @@ function LaunchProgress({
                   </span>
                 </span>
                 <span className={`mt-0.5 block break-words text-xs ${r.state === "error" ? "text-bad" : r.state === "done" || r.state === "skip" ? "text-good" : "text-muted"}`}>{r.text || waitLabel[r.state]}</span>
+                {r.tx && r.state === "done" && (
+                  <a href={txUrl(r.tx)} target="_blank" rel="noreferrer" className="num link mt-0.5 block text-xs">
+                    Tx {short(r.tx, 6)} ↗
+                  </a>
+                )}
               </span>
             </li>
           ))}
         </ul>
         <div className="mt-4 flex items-center justify-end gap-2">
-          {fourPool && run.four && !busy && (
-            <a href={addressUrl(fourPool)} target="_blank" rel="noreferrer" className="btn btn-sm">
-              TSLA market on the explorer
-            </a>
-          )}
-          {pool && run.more && !busy && stock !== "NVDA" && (
-            <a href={addressUrl(pool)} target="_blank" rel="noreferrer" className="btn btn-sm">
-              {stock} market on the explorer
-            </a>
-          )}
           {pool && run.more && !busy && (
             <Link href={tradeHref(stock)} className="btn-primary btn-sm">
               Trade my market

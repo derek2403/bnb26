@@ -7,7 +7,9 @@ import { useReadContracts } from "wagmi";
 import { OpenFourCoreAbi, OpenFourVaultAbi } from "@/abi";
 import { OF, PHASES, PHASE_MIGRATED, useOfTokens } from "@/hooks/useOpenFour";
 import { usePoolList } from "@/hooks/usePools";
+import { addressUrl } from "@/config/chains";
 import { fmtLev, fmtNum, fmtUsd, short } from "@/lib/format";
+import { useMyMarkets } from "@/lib/myMarkets";
 import { Empty, SourceBadge } from "../ui";
 import { LaunchMarketForm } from "./LaunchMarketForm";
 import { MemeDetail } from "./MemeDetail";
@@ -27,6 +29,7 @@ function MoreBadge() {
 type TokenInfo = { name: string; symbol: string; vault: Address; raiseAmount: bigint; exists: boolean; quoteAsset: Address };
 
 export function LaunchpadView() {
+  const mine = useMyMarkets();
   const list = useOfTokens();
   const tokens = list.data ?? [];
   const { rows, pending } = usePoolList();
@@ -118,6 +121,40 @@ export function LaunchpadView() {
         <span className="text-xs text-faint">Press a market to see its launch</span>
       </div>
       <section className="mt-2 grid gap-px overflow-hidden rounded-card border border-line bg-line md:grid-cols-2">
+        {mine.map((m) => (
+          <div key={m.id} className="bg-surface p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                {m.stock} market
+                <span className="rounded border border-line px-1.5 py-0.5 text-2xs font-normal text-good">New</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                {m.more && <MoreBadge />}
+                {m.four && <SourceBadge label="Four.meme" iconOnly />}
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              You launched this market at {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
+              {m.more ? " It is open on MORE." : ""}
+              {m.four ? ` ${m.fourName ?? "Its launch"} sold out on Four.meme and graduated.` : ""}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2 whitespace-nowrap">
+              {m.more && (
+                <a href={addressUrl(m.more)} target="_blank" rel="noreferrer" className="btn btn-sm">
+                  Pool on MORE
+                </a>
+              )}
+              {m.four && (
+                <a href={addressUrl(m.four)} target="_blank" rel="noreferrer" className="btn btn-sm">
+                  Pool from Four.meme
+                </a>
+              )}
+              <Link href={m.stock === "NVDA" ? "/trade/sandbox" : `/trade/${m.stock.toLowerCase()}`} className="btn-primary btn-sm">
+                Trade {m.stock}
+              </Link>
+            </div>
+          </div>
+        ))}
         <div className="bg-surface p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[13px] font-semibold text-ink">NVDA market</span>
@@ -241,7 +278,7 @@ export function LaunchpadView() {
             </span>
           </div>
         </div>
-        <div className="hidden bg-surface md:block" aria-hidden />
+        {mine.length % 2 === 0 && <div className="hidden bg-surface md:block" aria-hidden />}
         {showMsft && (
           <div ref={msftRef} className="bg-surface p-4 md:col-span-2">
             <ExampleFourLaunch />
