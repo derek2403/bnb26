@@ -69,7 +69,7 @@ Use this for narration or for judges' questions.
 
 - **Price source.** Every live market reads the Atlas feed for its stock. For NVDA that is the Atlas NVDAB feed on BSC mainnet, `0xf25af12920d408baf6211e9e90eda89df3d8ccda`.
 - **On testnet.** Atlas publishes on mainnet, so our keeper relays each Atlas update to a mirror contract on testnet, about every 60 seconds. The trade page shows the age of the last update: "Atlas · 24 s ago".
-- **Freshness rules.** Minting and single-token redeems need a price under 2 minutes old. If the feed halts, minting and xNVDA redeems stop, and redeeming sUSD and xNVDA together keeps working because it needs no price.
+- **Freshness rules.** Minting and xNVDA redeems need a price under 2 minutes old; sUSD redeems accept a price up to 24 hours old. If the feed halts, minting and xNVDA redeems stop, and redeeming sUSD and xNVDA together keeps working because it needs no price.
 - **Cross-check with CoinMarketCap.** The keeper posts CMC's price for the same stock on-chain. The pool compares the two inside the contract. If they are more than 2% apart, the breaker blocks new mints. Show this on the **Risk & AI** tab.
 - **Launches use it too.** Opening a market swaps the seed into the stock at an Atlas-priced minimum, and a Four.meme graduation only runs while the Atlas price is fresh.
 - **The sandbox.** It starts at the Atlas price and "Live price" resets it to Atlas. The moves in between are ours, which is why it is labelled a sandbox.
