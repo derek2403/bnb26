@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatEther, parseEther, zeroAddress, type Address } from "viem";
 import { bscTestnet } from "viem/chains";
-import { useReadContracts } from "wagmi";
+import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { SplitLauncherAbi } from "@/abi";
+import { SandboxFactoryAbi, SplitLauncherAbi } from "@/abi";
+import { addr, deployments97 } from "@/config/deployments";
+import { useTx } from "@/hooks/useTx";
 import { addressUrl, tokenUrl, txUrl } from "@/config/chains";
 import { STOCK_NAMES } from "@/config/demoPools";
 import { FLAP, useFlapFactoryInfo, useFlapLaunch, useMyLaunches, type LaunchStep, type MyLaunch } from "@/hooks/useFlapLaunch";
@@ -15,6 +17,26 @@ import { TickerIcon } from "../ui";
 
 const STOCKS = ["NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AVGO", "NFLX", "COIN", "MSTR", "AMD"] as const;
 const LIVE = "NVDA"; // the Flap launcher factory's stock is fixed (immutable config)
+
+type Venue = "more" | "flap" | "four";
+// Where the new market is listed. A tick list: one or more can be chosen.
+const VENUES: { id: Venue; name: string; logo?: string; note: string }[] = [
+  { id: "more", name: "MORE", logo: "/logos/more.png", note: "This platform" },
+  { id: "flap", name: "Flap", logo: "/partners/flap.png", note: "Token launch on Flap" },
+  { id: "four", name: "Four.meme", logo: "/partners/fourmeme.png", note: "Token launch on OpenFour" },
+];
+// MORE only: SandboxFactory.create() opens a pool on MORE's own PoolFactory from the user's wallet (one per wallet, NVDA).
+const DIRECT_FACTORY = addr(deployments97.core.sandboxFactory);
+const LEV_MIN = 1.5;
+const LEV_MAX = 3;
+const LEV_GAP = 0.3; // smallest allowed distance between the two ends of the range
+const THUMB =
+  "pointer-events-none absolute inset-0 h-5 w-full cursor-pointer appearance-none bg-transparent " +
+  "[&::-webkit-slider-runnable-track]:bg-transparent [&::-moz-range-track]:bg-transparent " +
+  "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none " +
+  "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[rgb(var(--lever))] " +
+  "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full " +
+  "[&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[rgb(var(--lever))]";
 
 const fmtBnb = (wei: bigint | undefined, d = 3) => (wei === undefined ? "…" : fmtNum(Number(formatEther(wei)), d));
 
@@ -45,7 +67,88 @@ export function LaunchMarketForm() {
   const { openConnectModal } = useConnectModal();
 
   const [stock, setStock] = useState<string>(LIVE);
-  const [lev, setLev] = useState(2);
+  const [venues, setVenues] = useState<Venue[]>(["more"]);
+  const toggleVenue = (v: Venue) => setVenues((cur) => (cur.includes(v) ? (cur.length > 1 ? cur.filter((x) => x !== v) : cur) : [...cur, v]));
+  const [levLo, setLevLo] = useState(1.6);
+  const [levHi, setLevHi] = useState(2.7);
+  // The launcher contract stores one requested leverage, so the middle of the range is sent.
+  const lev = Math.round(((levLo + levHi) / 2) * 10) / 10;
+  const pct = (x: number) => ((x - LEV_MIN) / (LEV_MAX - LEV_MIN)) * 100;
+  const venueNames = VENUES.filter((v) => venues.includes(v.id)).map((v) => v.name).join(", ");
+
+  // Which contracts the button calls, from the ticks: MORE -> our own factory, Flap -> the Flap launch.
+  const wantMore = venues.includes("more");
+  const wantFlap = venues.includes("flap");
+  const wantFour = venues.includes("four");
+  const { address: me } = useAccount();
+  const tx = useTx();
+  const mine = useReadContract({
+    address: DIRECT_FACTORY,
+    abi: SandboxFactoryAbi,
+    functionName: "sandboxOf",
+    args: me ? [me] : undefined,
+    chainId: bscTestnet.id,
+    query: { enabled: !!DIRECT_FACTORY && !!me, refetchInterval: 15_000 },
+  });
+  const myPool = (mine.data as { pool?: Address } | undefined)?.pool;
+  const hasDirect = !!myPool && myPool !== zeroAddress;
+  const [direct, setDirect] = useState<{ ok: boolean; text: string } | null>(null);
+  const [directBusy, setDirectBusy] = useState(false);
+  const openDirect = async () => {
+    if (!DIRECT_FACTORY) return false;
+    setDirectBusy(true);
+    setDirect(null);
+    const r = await tx.send({ address: DIRECT_FACTORY, abi: SandboxFactoryAbi, functionName: "create", args: [], label: "Open the market on MORE" } as never);
+    setDirectBusy(false);
+    void mine.refetch();
+    const ok = !!r && (r as { status?: string }).status === "success";
+    setDirect(ok ? { ok: true, text: "Market opened on MORE, directly on our pool factory." } : { ok: false, text: "The market was not opened on MORE." });
+    return ok;
+  };
+
+  // Four.meme: the server's operator key (the same key that funds a Flap launch) buys the rest of the TSLA Market
+  // launch on OpenFour. That sells it out, and graduation opens the TSLA market. No wallet confirm.
+  const [four, setFour] = useState<{ ok: boolean; text: string } | null>(null);
+  const [fourBusy, setFourBusy] = useState(false);
+  const launchFour = async () => {
+    setFourBusy(true);
+    setFour(null);
+    try {
+      const res = await fetch("/api/launch/fund-four", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const j = (await res.json()) as { ok: boolean; error?: string; steps?: string[] };
+      setFour(j.ok ? { ok: true, text: `Four.meme: ${j.steps?.length ? j.steps.join("; ") : "done"}.` } : { ok: false, text: `Four.meme: ${j.error ?? "the launch failed"}.` });
+    } catch {
+      setFour({ ok: false, text: "Four.meme: the launch failed. Try again." });
+    } finally {
+      setFourBusy(false);
+    }
+  };
+
+  // What the creator puts in, and how it is split between the two tokens (shown in the plan; see the note in the form).
+  const [deposit, setDeposit] = useState("2");
+  const [levShare, setLevShare] = useState(50); // percent of the deposit that becomes the leveraged token
+  const [aliceRate, setAliceRate] = useState("4");
+  const [bobRate, setBobRate] = useState("3.6");
+  const depNum = Number(deposit);
+  const depOk = Number.isFinite(depNum) && depNum > 0;
+  const levPart = depOk ? (depNum * levShare) / 100 : 0;
+  const stablePart = depOk ? depNum - levPart : 0;
+  const startLev = 100 / levShare;
+
+  // "Modify" on a market card (see LaunchpadView) selects that stock here and scrolls to this form.
+  const [editing, setEditing] = useState<string | null>(null);
+  const formRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const st = (e as CustomEvent<{ stock?: string }>).detail?.stock;
+      if (!st) return;
+      setStock(st);
+      setEditing(st);
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    window.addEventListener("more:edit-market", on);
+    return () => window.removeEventListener("more:edit-market", on);
+  }, []);
   const [raise, setRaise] = useState("4.7");
   const [seed, setSeed] = useState("0.2");
   const [days, setDays] = useState("3");
@@ -72,30 +175,82 @@ export function LaunchMarketForm() {
   else if (byteLen(name) > LAUNCH_BOUNDS.maxName || byteLen(symbol) > LAUNCH_BOUNDS.maxSymbol) problem = "Name or symbol too long.";
   if (!FLAP.factory || !FLAP.portal) problem = "The Flap launcher is not deployed on this network.";
 
-  const submit = () => {
-    if (problem || target === undefined || seedWei === undefined) return;
-    if (!flow.isConnected) {
+  const flapInput = () => ({ stock, targetLeverage: lev, targetRaise: target as bigint, backstopSeed: seedWei as bigint, saleDurationSec: durationSec });
+  const submit = async () => {
+    if ((wantMore || wantFlap) && !flow.isConnected) {
       openConnectModal?.();
       return;
     }
-    void flow.start({ stock, targetLeverage: lev, targetRaise: target, backstopSeed: seedWei, saleDurationSec: durationSec });
+    // Four.meme alone needs no wallet: the server key signs it.
+    // 1. MORE: straight to our own contract.
+    if (wantMore && !hasDirect) {
+      const ok = await openDirect();
+      if (!ok) return;
+    }
+    // 2. Flap: the pre-funded launch (only when ticked).
+    if (wantFlap && !problem && target !== undefined && seedWei !== undefined) void flow.start(flapInput());
+    // 3. Four.meme: signed by the server key, so it runs beside the wallet steps.
+    if (wantFour) void launchFour();
   };
+  const flapProblem = wantFlap ? problem : null;
+  const directProblem = wantMore && stock !== LIVE ? "A direct market on MORE supports NVDA on testnet." : wantMore && !DIRECT_FACTORY ? "The MORE pool factory is not deployed on this network." : null;
+  const nothingToDo = !wantFlap && !wantFour && (!wantMore || hasDirect);
+  const blocked = !!directProblem || !!flapProblem || nothingToDo;
 
   return (
-    <section className="mt-4 rounded-card border border-line bg-surface">
+    <section ref={formRef} id="open-market" className="mt-4 scroll-mt-20 rounded-card border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
-        <h2 className="text-[13px] font-semibold text-ink">Open a market</h2>
+        <h2 className="text-[13px] font-semibold text-ink">{editing ? `Modify my market · ${editing}` : "Open a market"}</h2>
         <span className="pill">
           <span className="h-1.5 w-1.5 rounded-full bg-lever" />
-          Pre-funded on Flap · BSC testnet
+          Pre-funded launch · BSC testnet
         </span>
       </div>
 
       <div className="grid gap-5 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
-          {/* 1. Stock */}
+          {/* 1. Where to launch */}
           <div>
-            <div className="label">1 · Stock</div>
+            <div className="flex items-baseline justify-between">
+              <span className="label">1 · Launch on</span>
+              <span className="text-2xs text-faint">Tick one or more</span>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {VENUES.map((v) => {
+                const on = venues.includes(v.id);
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    onClick={() => toggleVenue(v.id)}
+                    disabled={flow.busy}
+                    className={`flex h-12 min-w-0 items-center gap-3 rounded border px-3 text-left transition-colors ${on ? "border-accent bg-surface2" : "border-line hover:bg-surface2"}`}
+                  >
+                    <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border text-[12px] font-bold leading-none ${on ? "border-accent bg-accent text-white" : "border-line bg-surface text-transparent"}`} aria-hidden>
+                      ✓
+                    </span>
+                    {v.id === "more" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <span className="flex h-6 shrink-0 items-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={v.logo} alt="MORE" className="h-[13px] w-auto dark:invert" />
+                      </span>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={v.logo} alt="" width={24} height={24} className="h-6 w-6 shrink-0 rounded-md bg-white object-contain" />
+                    )}
+                    {v.id !== "more" && <span className="min-w-0 truncate text-[13px] font-semibold text-ink">{v.name}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Stock */}
+          <div>
+            <div className="label">2 · Stock</div>
             <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
               {STOCKS.map((s) => {
                 const on = s === stock;
@@ -121,10 +276,10 @@ export function LaunchMarketForm() {
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
                 <span>
                   TSLA launches through Four.meme (OpenFour) on testnet: the{" "}
-                  <a href="#four-launches" className="link">
+                  <button type="button" className="link" onClick={() => window.dispatchEvent(new Event("more:show-four"))}>
                     TSLA Market launch
-                  </a>{" "}
-                  is pre-funding below. Its last buy sells it out and opens the TSLA market.
+                  </button>{" "}
+                  is pre-funding. Its last buy sells it out and opens the TSLA market.
                 </span>
                 <FundFour />
               </div>
@@ -135,54 +290,137 @@ export function LaunchMarketForm() {
             )}
           </div>
 
-          {/* 2. Leverage */}
+          {/* 3. Leverage range */}
           <div>
             <div className="flex items-baseline justify-between">
-              <span className="label">2 · Leverage you want</span>
-              <span className="num text-sm font-semibold text-lever">{lev.toFixed(1)}x</span>
+              <span className="label">3 · Leverage range</span>
+              <span className="num text-sm font-semibold text-lever">
+                {levLo.toFixed(1)}x – {levHi.toFixed(1)}x
+              </span>
+            </div>
+            <div className="relative mt-3 h-5">
+              <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-surface2" />
+              <div className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-lever" style={{ left: `${pct(levLo)}%`, right: `${100 - pct(levHi)}%` }} />
+              <input
+                type="range"
+                min={LEV_MIN}
+                max={LEV_MAX}
+                step={0.1}
+                value={levLo}
+                onChange={(e) => setLevLo(Math.min(Number(e.target.value), Math.round((levHi - LEV_GAP) * 10) / 10))}
+                disabled={flow.busy}
+                className={THUMB}
+                aria-label="Lowest leverage"
+              />
+              <input
+                type="range"
+                min={LEV_MIN}
+                max={LEV_MAX}
+                step={0.1}
+                value={levHi}
+                onChange={(e) => setLevHi(Math.max(Number(e.target.value), Math.round((levLo + LEV_GAP) * 10) / 10))}
+                disabled={flow.busy}
+                className={THUMB}
+                aria-label="Highest leverage"
+              />
+            </div>
+            <div className="num mt-1 flex justify-between text-2xs text-faint">
+              <span>{LEV_MIN}x</span>
+              <span>{LEV_MAX}x</span>
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              The pool buys stock back at the low end and sells stock at the high end. The launch records the middle of this range ({lev.toFixed(1)}x). On testnet the market opens with MORE&apos;s standard band (about 1.5x–2.2x) and its risk settings apply.
+            </p>
+          </div>
+
+          {/* 4. Deposit and split */}
+          <div>
+            <div className="label">4 · Your deposit</div>
+            <div className="mt-2 flex items-center gap-2">
+              <input className="input max-w-[180px]" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} disabled={flow.busy} aria-label={`Deposit in t${stock}`} />
+              <span className="text-xs text-muted">t{stock}</span>
+            </div>
+            <div className="mt-3 flex items-baseline justify-between text-xs">
+              <span className="text-muted">How the deposit is split</span>
+              <span className="num text-ink">
+                starts at <span className="font-semibold text-lever">{startLev.toFixed(2)}x</span>
+              </span>
             </div>
             <input
               type="range"
-              min={1.5}
-              max={3}
-              step={0.1}
-              value={lev}
-              onChange={(e) => setLev(Number(e.target.value))}
+              min={34}
+              max={66}
+              step={1}
+              value={levShare}
+              onChange={(e) => setLevShare(Number(e.target.value))}
               disabled={flow.busy}
               className="mt-2 w-full accent-[rgb(var(--lever))]"
-              aria-label="Requested leverage"
+              aria-label="Share of the deposit that becomes the leveraged token"
             />
-            <div className="num flex justify-between text-2xs text-faint">
-              <span>1.5x</span>
-              <span>3x</span>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="rounded border border-line bg-surface2 px-3 py-2">
+                <div className="text-2xs text-faint">Leveraged · x{stock}</div>
+                <div className="num text-sm font-semibold text-lever">
+                  {fmtNum(levPart, 3)} t{stock} <span className="text-2xs font-normal text-faint">{levShare}%</span>
+                </div>
+              </div>
+              <div className="rounded border border-line bg-surface2 px-3 py-2">
+                <div className="text-2xs text-faint">Stable · sUSD</div>
+                <div className="num text-sm font-semibold text-stable">
+                  {fmtNum(stablePart, 3)} t{stock} <span className="text-2xs font-normal text-faint">{100 - levShare}%</span>
+                </div>
+              </div>
             </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted">Requested leverage is recorded with the launch. The market opens with MORE&apos;s standard band (about 1.5x–2.2x) and its risk settings apply.</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">Leverage at the start is the whole deposit divided by the leveraged part. A smaller leveraged part gives a higher leverage.</p>
           </div>
 
-          {/* 3. Raise */}
+          {/* 5. Rates */}
           <div>
-            <div className="label">3 · Raise</div>
-            <div className="mt-2 flex items-center gap-2">
-              <input className="input max-w-[180px]" inputMode="decimal" value={raise} onChange={(e) => setRaise(e.target.value)} disabled={flow.busy} aria-label="Raise in tBNB" />
-              <span className="text-xs text-muted">tBNB</span>
+            <div className="label">5 · Rates</div>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-2xs text-faint">Funding fee · leveraged holders pay (% a year)</span>
+                <span className="mt-1 flex items-center gap-2">
+                  <input className="input" inputMode="decimal" value={aliceRate} onChange={(e) => setAliceRate(e.target.value)} disabled={flow.busy} />
+                  <span className="text-xs text-muted">%</span>
+                </span>
+              </label>
+              <label className="block">
+                <span className="text-2xs text-faint">Lending rate · stable holders earn (% a year)</span>
+                <span className="mt-1 flex items-center gap-2">
+                  <input className="input" inputMode="decimal" value={bobRate} onChange={(e) => setBobRate(e.target.value)} disabled={flow.busy} />
+                  <span className="text-xs text-muted">%</span>
+                </span>
+              </label>
             </div>
-            <p className="mt-1.5 text-xs text-muted">
-              Minimum <span className="num text-ink">{fmtBnb(minTarget)}</span> tBNB with a {fmtBnb(seedWei, 2)} tBNB seed. Contributors fund this on Flap; you only pay the {fmtBnb(info.lockFee)} tBNB lock fee and gas.
-            </p>
-            <button type="button" className="mt-2 text-xs text-muted hover:text-ink" onClick={() => setAdvanced((v) => !v)}>
-              {advanced ? "Hide" : "Show"} advanced
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">The difference between the two rates is the share for the creator and the platform. On testnet the funding fee is fixed at 4% a year.</p>
+          </div>
+
+          {/* Launch settings that the testnet launcher needs */}
+          <div>
+            <button type="button" className="text-xs text-muted hover:text-ink" onClick={() => setAdvanced((v) => !v)}>
+              {advanced ? "Hide" : "Show"} launch settings (testnet)
             </button>
             {advanced && (
-              <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-2xs text-faint">Seed for the market (tBNB)</span>
-                  <input className="input mt-1" inputMode="decimal" value={seed} onChange={(e) => setSeed(e.target.value)} disabled={flow.busy} />
-                </label>
-                <label className="block">
-                  <span className="text-2xs text-faint">Raise window (days)</span>
-                  <input className="input mt-1" inputMode="decimal" value={days} onChange={(e) => setDays(e.target.value)} disabled={flow.busy} />
-                </label>
-              </div>
+              <>
+                <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                  <label className="block">
+                    <span className="text-2xs text-faint">Launch raise (tBNB)</span>
+                    <input className="input mt-1" inputMode="decimal" value={raise} onChange={(e) => setRaise(e.target.value)} disabled={flow.busy} aria-label="Raise in tBNB" />
+                  </label>
+                  <label className="block">
+                    <span className="text-2xs text-faint">Seed for the market (tBNB)</span>
+                    <input className="input mt-1" inputMode="decimal" value={seed} onChange={(e) => setSeed(e.target.value)} disabled={flow.busy} />
+                  </label>
+                  <label className="block">
+                    <span className="text-2xs text-faint">Raise window (days)</span>
+                    <input className="input mt-1" inputMode="decimal" value={days} onChange={(e) => setDays(e.target.value)} disabled={flow.busy} />
+                  </label>
+                </div>
+                <p className="mt-1.5 text-xs text-muted">
+                  On testnet a market opens through a pre-funded launch. Minimum raise <span className="num text-ink">{fmtBnb(minTarget)}</span> tBNB with a {fmtBnb(seedWei, 2)} tBNB seed. You pay only the {fmtBnb(info.lockFee)} tBNB lock fee and gas.
+                </p>
+              </>
             )}
           </div>
         </div>
@@ -198,17 +436,36 @@ export function LaunchMarketForm() {
           </div>
           <dl className="mt-3 space-y-1.5 text-xs">
             <Row k="Market" v={`sUSD + x${stock}`} />
-            <Row k="Requested leverage" v={`${lev.toFixed(1)}x`} />
-            <Row k="Raise" v={target !== undefined ? `${fmtBnb(target)} tBNB` : "–"} />
-            <Row k="Seed for the market" v={seedWei !== undefined ? `${fmtBnb(seedWei)} tBNB` : "–"} />
-            <Row k="Window" v={Number.isFinite(daysNum) ? `${fmtNum(daysNum, 2)} days` : "–"} />
-            <Row k="Wallet confirms" v="1–2" />
+            <Row k="Launch on" v={venueNames} />
+            <Row k="Leverage range" v={`${levLo.toFixed(1)}x – ${levHi.toFixed(1)}x`} />
+            <Row k="Deposit" v={depOk ? `${fmtNum(depNum, 3)} t${stock}` : "–"} />
+            <Row k="Leveraged / stable" v={`${levShare}% / ${100 - levShare}%`} />
+            <Row k="Starting leverage" v={`${startLev.toFixed(2)}x`} />
+            <Row k="Funding fee" v={`${aliceRate || "–"}% a year`} />
+            <Row k="Lending rate" v={`${bobRate || "–"}% a year`} />
+            <Row k="Wallet confirms" v={`${(wantMore && !hasDirect ? 1 : 0) + (wantFlap ? 2 : 0)}`} />
+            <Row k="Contract" v={[wantMore ? "MORE pool factory" : "", wantFlap ? "Flap portal" : "", wantFour ? "OpenFour" : ""].filter(Boolean).join(" + ")} />
           </dl>
-          <button type="button" className="btn-primary mt-3 w-full" disabled={!!problem || flow.busy} onClick={submit}>
-            {flow.busy ? (flow.step === "mining" ? "Finding a 7777 address…" : "Confirm in your wallet…") : "Send to Flap for pre-funding"}
+          <button type="button" className="btn-primary mt-3 w-full" disabled={blocked || flow.busy || directBusy || fourBusy} onClick={() => void submit()}>
+            {directBusy ? "Confirm in your wallet…" : fourBusy && !flow.busy ? "Launching on Four.meme…" : flow.busy ? (flow.step === "mining" ? "Finding a 7777 address…" : "Confirm in your wallet…") : editing ? "Save and relaunch the market" : "Launch the market"}
           </button>
-          {problem && <p className="mt-2 text-xs text-warn">{problem}</p>}
-          {!problem && !flow.isConnected && flow.step === "idle" && <p className="mt-2 text-xs text-muted">You will be asked to connect a wallet first.</p>}
+          {directProblem && <p className="mt-2 text-xs text-warn">{directProblem}</p>}
+          {flapProblem && <p className="mt-2 text-xs text-warn">{flapProblem}</p>}
+          {four && <p className={`mt-2 break-words text-xs ${four.ok ? "text-good" : "text-bad"}`}>{four.text}</p>}
+          {wantMore && hasDirect && (
+            <p className="mt-2 text-xs text-muted">
+              This wallet already has a market on MORE:{" "}
+              <a className="num link" href={addressUrl(myPool!)} target="_blank" rel="noreferrer">
+                {short(myPool!, 6)}
+              </a>
+              .{" "}
+              <Link href="/trade/sandbox" className="link">
+                Trade it
+              </Link>
+            </p>
+          )}
+          {direct && <p className={`mt-2 text-xs ${direct.ok ? "text-good" : "text-bad"}`}>{direct.text}</p>}
+          {!blocked && !flow.isConnected && flow.step === "idle" && <p className="mt-2 text-xs text-muted">You will be asked to connect a wallet first.</p>}
           {flow.step !== "idle" && flow.step !== "error" && (
             <p className={`mt-2 text-xs ${flow.step === "done" ? "text-good" : "text-muted"}`}>
               {STEP_TEXT[flow.step]}
@@ -216,7 +473,11 @@ export function LaunchMarketForm() {
             </p>
           )}
           {flow.step === "error" && flow.error && <p className="mt-2 break-words text-xs text-bad">{flow.error}</p>}
-          <p className="mt-2 text-2xs leading-relaxed text-faint">When the raise fills, the token launches on Flap and the seed opens the new {stock} market on MORE. If the raise misses its window, contributors get full refunds.</p>
+{wantFlap && (
+            <p className="mt-2 text-2xs leading-relaxed text-faint">
+              Flap: when the raise fills, the token launches on Flap and the seed opens the new {stock} market on MORE. If the raise misses its window, contributors get full refunds.
+            </p>
+          )}
         </div>
       </div>
 
