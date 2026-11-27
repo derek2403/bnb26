@@ -29,7 +29,8 @@ type PoolAction = "mintLever" | "mintStable" | "redeemStable" | "redeemLever" | 
 type Tab = PoolAction | "insurance";
 type InsuranceAction = "deposit" | "withdraw";
 
-// redeemFeeBps of the pool (0.2%), applied to redeemStable, redeemLever and redeemPair.
+// redeemFeeBps of the pool (0.2%). Used only for the redeemPair fee line; the other redeem quotes return their fee
+// from the pool (redeemLever is 1% in stability mode). The admin can change redeemFeeBps, up to 1%.
 const REDEEM_FEE_BPS = 20n;
 
 const TABS: Tab[] = ["mintLever", "mintStable", "redeemStable", "redeemLever", "redeemPair", "insurance"];
